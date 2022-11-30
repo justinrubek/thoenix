@@ -4,9 +4,7 @@
   lib,
   ...
 }: {
-  imports = [
-    ./custom-outputs.nix
-  ];
+  imports = [];
 
   flake.lib = rec {
     # call into terranix to build a configuration, loading all `.nix` files in the directory as modules
