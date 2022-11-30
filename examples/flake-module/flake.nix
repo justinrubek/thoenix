@@ -29,6 +29,7 @@
       systems = ["x86_64-linux" "aarch64-linux"];
       imports = [
         pre-commit-hooks.flakeModule
+        inputs.thoenix.flakeModule
         inputs.thoenix.customOutputModule
         ./flake-parts
       ];
