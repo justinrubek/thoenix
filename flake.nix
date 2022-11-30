@@ -16,6 +16,15 @@
         ./lib.nix
       ];
 
-      flake.customOutputModule = ./custom-outputs.nix;
+      flake = {
+        templates = {
+          lib = {
+            path = ./examples/lib;
+            description = "A project using the thoenix's lib to manage terraform configurations";
+          };
+        };
+
+        customOutputModule = ./custom-outputs.nix;
+      };
     };
 }
