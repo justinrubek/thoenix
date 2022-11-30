@@ -5,7 +5,7 @@
 
     terranix.url = "github:terranix/terranix";
     thoenix = {
-      url = "path:/home/justin/projects/thoenix";
+      url = "github:justinrubek/thoenix";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         terranix.follows = "terranix";
