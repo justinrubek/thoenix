@@ -12,7 +12,6 @@
     ...
   }:
     flake-parts.lib.mkFlake {inherit self;} {
-      systems = ["x86_64-linux" "aarch64-linux"];
       imports = [
         ./lib.nix
       ];
