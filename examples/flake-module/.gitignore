@@ -1,0 +1,7 @@
+# don't allow generated terranix configurations to be committed without manual review
+terraform/configurations/*/config.tf.json
+terraform/configurations/*/.terraform
+
+.pre-commit-config.yaml
+
+.direnv

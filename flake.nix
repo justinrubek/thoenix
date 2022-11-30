@@ -22,6 +22,11 @@
             path = ./examples/lib;
             description = "A project using the thoenix's lib to manage terraform configurations";
           };
+
+          flake-module = {
+            path = ./examples/flake-module;
+            description = "A project using the thoenix's flake-parts module to manage terraform configurations";
+          };
         };
 
         flakeModule = ./flake-parts/flake-module.nix;
