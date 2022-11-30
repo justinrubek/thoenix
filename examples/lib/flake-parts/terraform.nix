@@ -35,7 +35,7 @@
     };
 
     apps = let
-      jq = "${pkgs.jq}/bin/jq";
+      jq = pkgs.lib.getExe pkgs.jq;
 
       # print the list of pinnable terraform providers from nixpkgs
       terraform-provider-pins = pkgs.writeShellScriptBin "terraform-provider-pins" ''

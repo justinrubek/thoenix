@@ -24,6 +24,7 @@
           };
         };
 
+        flakeModule = ./flake-parts/flake-module.nix;
         customOutputModule = ./custom-outputs.nix;
       };
     };

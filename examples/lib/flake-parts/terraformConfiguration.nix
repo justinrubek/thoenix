@@ -17,17 +17,21 @@
     # individual terraform configurations are stored in the `terraform/configuration` directory
     # and are referenced by their name in the configuration directory
     terraformConfigurationDirectory = ../terraform/configurations;
-    terraformConfigurationNames = inputs.thoenix.lib.determineSubdirNames {
-      path = terraformConfigurationDirectory;
-    };
 
     # builds the terranix configuration for each terraform configuration
     # and merges them into a single configuration derivation
     finalConfigurations = inputs.thoenix.lib.buildTerraformConfigurations {
       configDir = terraformConfigurationDirectory;
-      configNames = terraformConfigurationNames;
+      configNames = inputs.thoenix.lib.determineSubdirNames {
+        path = terraformConfigurationDirectory;
+      };
+
       inherit pkgs system;
     };
+
+    # we could get the configure names directly from `determineSubdirNames`, but
+    # the output of `buildTerraformConfigurations` is a set, so we can just use attrNames
+    terraformConfigurationNames = builtins.attrNames finalConfigurations;
 
     # rename all values from finalConfigurations to be prefixed with `terraformConfiguration_`
     # this allows them to be specified in the `packages` flake output
@@ -35,7 +39,7 @@
       prefix = "terraformConfiguration_";
       reducer = l: r: l // {"${prefix}${r}" = finalConfigurations.${r};};
     in
-      builtins.foldl' reducer {} (builtins.attrNames finalConfigurations);
+      builtins.foldl' reducer {} terraformConfigurationNames;
 
     # create a JSON file containing the names of configurations as well as paths to their directories
     # { configurations = [ { name = "core"; path = "/nix/store/..."; } ]; }
@@ -71,11 +75,13 @@
       // terraformConfigurationOutput;
 
     # expose all configuration packages, but using a custom output to avoid namespacing
+    # this is an alternative to the above `packages` output
+    # you can build these using `nix build .#terraformConfigurations.${system}.${name}`
     terraformConfigurationPackages = finalConfigurations;
 
     apps = let
       # shortcuts for running commands inside a writeShellScriptBin
-      jq = "${pkgs.jq}/bin/jq";
+      jq = pkgs.lib.getBin pkgs.jq;
 
       generate-matrix-names = pkgs.writeShellScriptBin "generate-terraform-matrix" ''
         # access the 'name' key of each configuration
