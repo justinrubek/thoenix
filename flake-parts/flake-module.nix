@@ -34,6 +34,15 @@
               separate configuration.
             '';
           };
+
+          terranixModules = lib.mkOption {
+            type = lib.types.listOf lib.types.unspecified;
+            default = [];
+            description = ''
+              A list of nix modules for terranix to include in the generated
+              terraform configurations.
+            '';
+          };
         };
       };
 
@@ -49,6 +58,7 @@
           configNames = inputs.thoenix.lib.determineSubdirNames {
             path = terraformConfigurationDirectory;
           };
+          terranixModules = cfg.terranixModules;
 
           inherit pkgs system;
         };
