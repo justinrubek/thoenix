@@ -11,7 +11,12 @@
     mkTerranixConfiguration = {
       path,
       system,
-    }: let
+      terranixModules ? [],
+      ...
+    }@attrs: let
+      # pass unused arguments to terranix
+      extraAttrs = builtins.removeAttrs attrs [ "path" "system" ];
+
       filterFileName = name: lib.strings.hasSuffix ".nix" name;
 
       # filter out all directories and files that are not .nix files
@@ -22,7 +27,9 @@
       modules = map (x: "${path}/${x}") nixFiles;
     in
       inputs.terranix.lib.terranixConfiguration {
-        inherit system modules;
+        inherit system;
+
+        modules = terranixModules ++ modules;
         # support manually specifying null values. without this terranix will remove keys with a null value
         # strip_nulls = true;
       };
@@ -50,8 +57,14 @@
       path,
       pkgs,
       system,
-    }: let
       generatedConfig = self.lib.mkTerranixConfiguration {inherit path system;};
+      terranixModules ? [],
+      ...
+    }@attrs: let
+      # pass unused arguments to mkTerranixConfiguration
+      extraAttrs = builtins.removeAttrs attrs [ "name" "path" "pkgs" "system" ];
+
+      generatedConfig = self.lib.mkTerranixConfiguration {inherit path system terranixModules; } // extraAttrs;
       providedConfig = self.lib.mkTerraformConfiguration {inherit path;};
     in
       pkgs.runCommandNoCC "terraform-config-${name}" {} ''
@@ -68,13 +81,14 @@
       configNames,
       system,
       pkgs,
+      terranixModules ? [],
     }: let
       # reducer should provide an output containing the configurations keyed by name
       reducer = l: r: let
         path = "${configDir}/${r}";
         configuration = self.lib.mkTerraformConfigurationPackage {
           name = r;
-          inherit path pkgs system;
+          inherit path pkgs system terranixModules;
         };
       in
         {
