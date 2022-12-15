@@ -57,7 +57,6 @@
       path,
       pkgs,
       system,
-      generatedConfig = self.lib.mkTerranixConfiguration {inherit path system;};
       terranixModules ? [],
       ...
     }@attrs: let
