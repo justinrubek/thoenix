@@ -43,6 +43,14 @@
               terraform configurations.
             '';
           };
+
+          extraArgs = lib.mkOption {
+            type = lib.types.attrsOf lib.types.str;
+            default = {};
+            description = ''
+              Extra arguments to pass to terranix.
+            '';
+          };
         };
       };
 
@@ -59,6 +67,7 @@
             path = terraformConfigurationDirectory;
           };
           terranixModules = cfg.terranixModules;
+          extraArgs = cfg.extraArgs;
 
           inherit pkgs system;
         };
