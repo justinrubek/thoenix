@@ -12,6 +12,7 @@
       path,
       system,
       terranixModules ? [],
+      extraArgs ? {},
       ...
     }@attrs: let
       # pass unused arguments to terranix
@@ -28,6 +29,7 @@
     in
       inputs.terranix.lib.terranixConfiguration {
         inherit system;
+        inherit extraArgs;
 
         modules = terranixModules ++ modules;
         # support manually specifying null values. without this terranix will remove keys with a null value
@@ -58,12 +60,13 @@
       pkgs,
       system,
       terranixModules ? [],
+      extraArgs ? {},
       ...
     }@attrs: let
       # pass unused arguments to mkTerranixConfiguration
       extraAttrs = builtins.removeAttrs attrs [ "name" "path" "pkgs" "system" ];
 
-      generatedConfig = self.lib.mkTerranixConfiguration {inherit path system terranixModules; } // extraAttrs;
+      generatedConfig = self.lib.mkTerranixConfiguration {inherit path system terranixModules extraArgs; } // extraAttrs;
       providedConfig = self.lib.mkTerraformConfiguration {inherit path;};
     in
       pkgs.runCommandNoCC "terraform-config-${name}" {} ''
@@ -81,13 +84,14 @@
       system,
       pkgs,
       terranixModules ? [],
+      extraArgs ? {},
     }: let
       # reducer should provide an output containing the configurations keyed by name
       reducer = l: r: let
         path = "${configDir}/${r}";
         configuration = self.lib.mkTerraformConfigurationPackage {
           name = r;
-          inherit path pkgs system terranixModules;
+          inherit path pkgs system terranixModules extraArgs;
         };
       in
         {
