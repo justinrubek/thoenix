@@ -45,7 +45,7 @@
           };
 
           extraArgs = lib.mkOption {
-            type = lib.types.attrsOf lib.types.str;
+            type = lib.types.attrsOf lib.types.unspecified;
             default = {};
             description = ''
               Extra arguments to pass to terranix.
