@@ -8,6 +8,10 @@ pub enum AppError {
     Russh(#[from] russh::Error),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+
+    // Application specific errors
+    #[error("no data directory specified")]
+    NoDataDir,
 }
 
 pub type AppResult<T> = Result<T, AppError>;
