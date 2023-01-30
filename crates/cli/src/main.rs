@@ -1,6 +1,6 @@
 use russh::server::{Auth, Session};
 use russh_keys::PublicKeyBase64;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, path::PathBuf};
 use tokio::sync::Mutex;
 
 mod error;
@@ -8,40 +8,44 @@ use error::AppResult;
 use tracing::info;
 
 #[derive(Clone, Debug)]
-struct SshServer;
+struct SshServer {
+    data_dir: PathBuf,
+}
 
 impl russh::server::Server for SshServer {
     type Handler = SshSession;
 
     fn new_client(&mut self, addr: Option<SocketAddr>) -> Self::Handler {
         info!(?addr, "new client");
-        SshSession::default()
+        SshSession::new(self.data_dir.clone())
     }
 }
 
 struct SshSession {
     clients: Arc<Mutex<HashMap<russh::ChannelId, russh::Channel<russh::server::Msg>>>>,
+    data_dir: PathBuf,
 }
 
-impl Default for SshSession {
-    fn default() -> Self {
+impl SshSession {
+    fn new(data_dir: PathBuf) -> Self {
         SshSession {
             clients: Arc::new(Mutex::new(HashMap::new())),
+            data_dir,
         }
     }
-}
 
-/// Respond with one line for each reference we currently have
-/// The first line also haas a list of the server's capabilities
-/// The data is transmitted in chunks.
-/// Each chunk starts with a 4 character hex value specifying the length of the chunk (including the 4 character hex value)
-/// Chunks usually contain a single line of data and a trailing linefeed
-async fn receive_pack(args: Vec<&str>) -> AppResult<()> {
-    info!(?args, "git-receive-pack");
-    // TODO: First, determine the repository name and path
+    /// Respond with one line for each reference we currently have
+    /// The first line also haas a list of the server's capabilities
+    /// The data is transmitted in chunks.
+    /// Each chunk starts with a 4 character hex value specifying the length of the chunk (including the 4 character hex value)
+    /// Chunks usually contain a single line of data and a trailing linefeed
+    async fn receive_pack(&self, args: Vec<&str>) -> AppResult<()> {
+        info!(?args, ?self.data_dir, "git-receive-pack");
+        // TODO: First, determine the repository name and path
 
-    // TODO: Is it enough to just invoke the command from the proper directory?
-    Ok(())
+        // TODO: Is it enough to just invoke the command from the proper directory?
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -112,7 +116,7 @@ impl russh::server::Handler for SshSession {
 
         match parse_command(&command_str) {
             Some(("git-receive-pack", args)) => {
-                let _res = receive_pack(args).await?;
+                let _res = self.receive_pack(args).await?;
 
                 Ok((self, session))
             }
@@ -129,6 +133,9 @@ impl russh::server::Handler for SshSession {
 async fn main() -> AppResult<()> {
     tracing_subscriber::fmt::init();
 
+    // first arg: the directory to store repositories in
+    let data_dir = std::env::args().nth(1).ok_or(error::AppError::NoDataDir)?;
+
     let config = russh::server::Config {
         auth_rejection_time: std::time::Duration::from_secs(3),
         auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
@@ -137,7 +144,9 @@ async fn main() -> AppResult<()> {
         ..Default::default()
     };
 
-    let server = SshServer;
+    let server = SshServer {
+        data_dir: PathBuf::from(data_dir),
+    };
 
     let address = (
         "127.0.0.10",
