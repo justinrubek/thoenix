@@ -9,6 +9,9 @@ struct ChunkCodec;
 const CHUNK_LENGTH_BYTES: usize = 4;
 
 fn hex_char_value(byte: u8) -> Option<u8> {
+    if byte == 0 {
+        return Some(0);
+    }
     match byte {
         b'0'..=b'9' => Some(byte - b'0'),
         b'a'..=b'f' => Some(byte - b'a' + 10),
@@ -29,7 +32,8 @@ impl Decoder for ChunkCodec {
         let chunk_len = (buf[0..CHUNK_LENGTH_BYTES])
             .iter()
             .try_fold(0, |value, &byte| {
-                let char_value = hex_char_value(byte)?;
+                let char_value = hex_char_value(byte);
+                let char_value = char_value?;
                 Some(value << 4 | char_value as usize)
             })
             .ok_or_else(|| AppError::Anyhow(anyhow::anyhow!("invalid chunk length")))?;
@@ -37,7 +41,7 @@ impl Decoder for ChunkCodec {
 
         if chunk_len == 0 {
             // TODO: end of stream?
-            return Ok(None);
+            return Ok(Some(vec![]));
         }
 
         // the length includes the length bytes themselves, so subtract them
@@ -68,10 +72,16 @@ impl Encoder<Vec<u8>> for ChunkCodec {
     type Error = AppError;
 
     fn encode(&mut self, item: Vec<u8>, dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
-        let chunk_len = item.len() + CHUNK_LENGTH_BYTES;
-        let chunk_len_hex = format!("{chunk_len:04x}");
-        dst.extend_from_slice(chunk_len_hex.as_bytes());
-        dst.extend_from_slice(&item);
+        if item.is_empty() {
+            // a zero-length chunk is the end of the stream, but we need to send 0000
+            dst.extend_from_slice(b"0000");
+        } else {
+            let chunk_len = item.len() + CHUNK_LENGTH_BYTES;
+            let chunk_len_hex = format!("{chunk_len:04x}");
+            dst.extend_from_slice(chunk_len_hex.as_bytes());
+            dst.extend_from_slice(&item);
+        }
+
         Ok(())
     }
 }
@@ -110,6 +120,7 @@ impl Encoder<String> for TextChunkCodec {
 #[cfg(test)]
 mod tests {
     use crate::codec::{ChunkCodec, TextChunkCodec};
+    use crate::error::{AppError, AppResult};
     use tokio_util::codec::{Decoder, Encoder};
 
     #[tokio::test]
@@ -140,5 +151,32 @@ mod tests {
         expected.pop();
 
         assert_eq!(decoded, expected);
+    }
+
+    #[tokio::test]
+    async fn encode_empty_chunk() {
+        let mut codec = TextChunkCodec;
+        let mut buf = bytes::BytesMut::new();
+        codec.encode("".to_string(), &mut buf).unwrap();
+
+        let mut expected = bytes::BytesMut::new();
+        expected.extend_from_slice("0000".as_bytes());
+
+        assert_eq!(buf, expected);
+    }
+
+    #[tokio::test]
+    async fn decode_empty_chunk() -> AppResult<()> {
+        let mut codec = TextChunkCodec;
+        let mut buf = bytes::BytesMut::new();
+        codec.encode("".to_string(), &mut buf).unwrap();
+
+        let decoded = codec.decode(&mut buf)?.ok_or_else(|| {
+            AppError::Anyhow(anyhow::anyhow!("failed to properly handle empty chunk"))
+        })?;
+
+        assert_eq!(decoded, "");
+
+        Ok(())
     }
 }
