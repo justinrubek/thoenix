@@ -86,7 +86,7 @@ impl Encoder<Vec<u8>> for ChunkCodec {
     }
 }
 
-struct TextChunkCodec;
+pub struct TextChunkCodec;
 
 impl Decoder for TextChunkCodec {
     type Item = String;
