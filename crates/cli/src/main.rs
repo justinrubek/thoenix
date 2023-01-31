@@ -1,16 +1,19 @@
+use futures::{SinkExt, TryStreamExt};
 use russh::server::{Auth, Session};
 use russh_keys::PublicKeyBase64;
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{
-    io::{AsyncRead, AsyncWrite},
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
     macros::support::Pin,
     sync::Mutex,
 };
+use tokio_util::codec::Framed;
+use tracing::info;
 
 mod codec;
 mod error;
+use codec::TextChunkCodec;
 use error::AppResult;
-use tracing::info;
 
 /// A thin wrapper around tokio::process::Child that implements AsyncRead
 /// and AsyncWrite on top of the child's stdout and stdin.
@@ -123,11 +126,11 @@ impl SshSession {
         }
 
         let channel = self.get_channel(channel_id).await;
-        let _stream = channel.into_stream();
+        let stream = channel.into_stream();
 
         // invoke git-receive-pack
         // send the output to the channel
-        let _child = tokio::process::Command::new("git")
+        let child = tokio::process::Command::new("git")
             .arg("receive-pack")
             .arg(&repo_path)
             .stdin(std::process::Stdio::piped())
@@ -135,6 +138,25 @@ impl SshSession {
             .spawn()?;
 
         // tokio::io::copy_bidirectional(&mut child_process, &mut stream).await?;
+        let child_process = ChildProcess { inner: child };
+
+        let mut client = Framed::new(child_process, TextChunkCodec);
+        let mut server = Framed::new(stream, TextChunkCodec);
+
+        loop {
+            let chunk = client.try_next().await?;
+            info!(?chunk);
+            if let Some(chunk) = chunk {
+                if chunk.is_empty() {
+                    // Send the final empty chunk to indicate the end of the stream
+                    server.send(chunk).await?;
+                    break;
+                }
+                server.send(chunk).await?;
+            }
+        }
+
+        info!("done reading from child process");
 
         // collect stdout
         // let mut stdout = child.stdout.unwrap();
@@ -203,7 +225,7 @@ impl russh::server::Handler for SshSession {
         mut self,
         channel_id: russh::ChannelId,
         data: &[u8],
-        session: Session,
+        mut session: Session,
     ) -> AppResult<(Self, Session)> {
         info!(?data, %channel_id, "exec request");
         let msg = russh::ChannelMsg::Exec {
@@ -226,6 +248,7 @@ impl russh::server::Handler for SshSession {
             Some(("git-receive-pack", args)) => {
                 let _res = self.receive_pack(channel_id, args).await?;
 
+                session.channel_success(channel_id);
                 Ok((self, session))
             }
             Some(("git-upload-pack", args)) => {
@@ -240,6 +263,38 @@ impl russh::server::Handler for SshSession {
             None => unimplemented!(),
         }
     }
+
+    async fn data(
+        self,
+        _channel_id: russh::ChannelId,
+        data: &[u8],
+        _session: Session,
+    ) -> AppResult<(Self, Session)> {
+        info!(?data, "data");
+        todo!()
+    }
+}
+
+/// Load a keypair from a file, or generate a new one if it doesn't exist.
+async fn get_keypair(data_dir: &str) -> AppResult<russh_keys::key::KeyPair> {
+    let key_path = std::path::Path::new(&data_dir).join("id_rsa");
+    if !key_path.exists() {
+        // generate a keypair if none exists
+        let keys = russh_keys::key::KeyPair::generate_ed25519().unwrap();
+        let mut key_file = tokio::fs::File::create(&key_path).await?;
+
+        let russh_keys::key::KeyPair::Ed25519(inner_pair) = keys;
+
+        key_file.write_all(&inner_pair.to_bytes()).await?;
+
+        Ok(russh_keys::key::KeyPair::Ed25519(inner_pair))
+    } else {
+        // load the keypair from the file
+        let key_data = tokio::fs::read(&key_path).await?;
+        let keypair = ed25519_dalek::Keypair::from_bytes(&key_data)?;
+
+        Ok(russh_keys::key::KeyPair::Ed25519(keypair))
+    }
 }
 
 #[tokio::main]
@@ -250,10 +305,12 @@ async fn main() -> AppResult<()> {
     let data_dir = std::env::args().nth(1).ok_or(error::AppError::NoDataDir)?;
     // TODO: ensure data_dir exists
 
+    let keys = get_keypair(&data_dir).await?;
+
     let config = russh::server::Config {
         auth_rejection_time: std::time::Duration::from_secs(3),
         auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
-        keys: vec![russh_keys::key::KeyPair::generate_ed25519().unwrap()],
+        keys: vec![keys],
         connection_timeout: Some(std::time::Duration::from_secs(15)),
         ..Default::default()
     };

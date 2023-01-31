@@ -10,6 +10,8 @@ pub enum AppError {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     FromUtf8(#[from] std::string::FromUtf8Error),
+    #[error(transparent)]
+    Ed25519(#[from] ed25519_dalek::ed25519::Error),
 
     // Application specific errors
     #[error("no data directory specified")]
