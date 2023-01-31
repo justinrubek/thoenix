@@ -1,9 +1,9 @@
 use russh::server::{Auth, Session};
 use russh_keys::PublicKeyBase64;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, path::PathBuf};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{
-    macros::support::Pin,
     io::{AsyncRead, AsyncWrite},
+    macros::support::Pin,
     sync::Mutex,
 };
 
@@ -12,7 +12,7 @@ mod error;
 use error::AppResult;
 use tracing::info;
 
-/// A thin wrapper around tokio::process::Child that implements AsyncRead 
+/// A thin wrapper around tokio::process::Child that implements AsyncRead
 /// and AsyncWrite on top of the child's stdout and stdin.
 struct ChildProcess {
     inner: tokio::process::Child,
@@ -82,7 +82,10 @@ impl SshSession {
         }
     }
 
-    async fn get_channel(&mut self, channel_id: russh::ChannelId) -> russh::Channel<russh::server::Msg> {
+    async fn get_channel(
+        &mut self,
+        channel_id: russh::ChannelId,
+    ) -> russh::Channel<russh::server::Msg> {
         let mut clients = self.clients.lock().await;
         clients.remove(&channel_id).unwrap()
     }
@@ -93,11 +96,18 @@ impl SshSession {
     /// Each chunk starts with a 4 character hex value specifying the length of the chunk (including the 4 character hex value)
     /// Chunks usually contain a single line of data and a trailing linefeed
     #[tracing::instrument(skip(self, args))]
-    async fn receive_pack(&mut self, channel_id: russh::ChannelId, args: Vec<&str>) -> AppResult<()> {
+    async fn receive_pack(
+        &mut self,
+        channel_id: russh::ChannelId,
+        args: Vec<&str>,
+    ) -> AppResult<()> {
         info!(?args, ?self.data_dir, "git-receive-pack");
         // First, determine the repository name and path
         // We need to clean up the text from the url and make it a relative path to the data directory
-        let repo_name = args[0].replace('\'', "").trim_start_matches('/').to_string();
+        let repo_name = args[0]
+            .replace('\'', "")
+            .trim_start_matches('/')
+            .to_string();
         let repo_path = self.data_dir.join(repo_name);
         info!(?repo_path);
 
@@ -135,12 +145,15 @@ impl SshSession {
         Ok(())
     }
 
-    async fn upload_pack(&mut self, _channel_id: russh::ChannelId, args: Vec<&str>) -> AppResult<()> {
+    async fn upload_pack(
+        &mut self,
+        _channel_id: russh::ChannelId,
+        args: Vec<&str>,
+    ) -> AppResult<()> {
         info!(?args, ?self.data_dir, "git-upload-pack");
 
         todo!()
     }
-
 }
 
 #[async_trait::async_trait]

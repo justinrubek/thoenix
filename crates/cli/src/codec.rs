@@ -26,12 +26,13 @@ impl Decoder for ChunkCodec {
             return Ok(None);
         }
         // read the length of the chunk
-        let chunk_len = (buf[0..CHUNK_LENGTH_BYTES]).iter().try_fold(0, |value, &byte| {
-            let char_value = hex_char_value(byte)?;
-            Some(value << 4 | char_value as usize)
-        }).ok_or_else(|| {
-            AppError::Anyhow(anyhow::anyhow!("invalid chunk length"))
-        })?;
+        let chunk_len = (buf[0..CHUNK_LENGTH_BYTES])
+            .iter()
+            .try_fold(0, |value, &byte| {
+                let char_value = hex_char_value(byte)?;
+                Some(value << 4 | char_value as usize)
+            })
+            .ok_or_else(|| AppError::Anyhow(anyhow::anyhow!("invalid chunk length")))?;
         tracing::info!(?chunk_len, "decode");
 
         if chunk_len == 0 {
@@ -40,9 +41,9 @@ impl Decoder for ChunkCodec {
         }
 
         // the length includes the length bytes themselves, so subtract them
-        let chunk_len = chunk_len.checked_sub(CHUNK_LENGTH_BYTES).ok_or_else(|| {
-            AppError::Anyhow(anyhow::anyhow!("invalid chunk length"))
-        })?;
+        let chunk_len = chunk_len
+            .checked_sub(CHUNK_LENGTH_BYTES)
+            .ok_or_else(|| AppError::Anyhow(anyhow::anyhow!("invalid chunk length")))?;
 
         // check if the entire chunk is in the buffer
         if buf.len() < chunk_len + CHUNK_LENGTH_BYTES {
@@ -50,7 +51,12 @@ impl Decoder for ChunkCodec {
         }
 
         // skip the length, get the chunk
-        let chunk: Vec<u8> = buf.iter().skip(CHUNK_LENGTH_BYTES).take(chunk_len).copied().collect();
+        let chunk: Vec<u8> = buf
+            .iter()
+            .skip(CHUNK_LENGTH_BYTES)
+            .take(chunk_len)
+            .copied()
+            .collect();
         // remove the chunk from the buffer
         buf.advance(chunk_len + CHUNK_LENGTH_BYTES);
 
@@ -103,8 +109,8 @@ impl Encoder<String> for TextChunkCodec {
 
 #[cfg(test)]
 mod tests {
-    use tokio_util::codec::{Decoder, Encoder};
     use crate::codec::{ChunkCodec, TextChunkCodec};
+    use tokio_util::codec::{Decoder, Encoder};
 
     #[tokio::test]
     async fn encode_strings() {
