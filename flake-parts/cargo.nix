@@ -17,6 +17,7 @@
       fenix-toolchain
       bacon
       rustfmt
+      cargo-nextest
       # misc
     ];
 
