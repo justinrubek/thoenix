@@ -8,18 +8,6 @@ struct ChunkCodec;
 
 const CHUNK_LENGTH_BYTES: usize = 4;
 
-fn hex_char_value(byte: u8) -> Option<u8> {
-    if byte == 0 {
-        return Some(0);
-    }
-    match byte {
-        b'0'..=b'9' => Some(byte - b'0'),
-        b'a'..=b'f' => Some(byte - b'a' + 10),
-        b'A'..=b'F' => Some(byte - b'A' + 10),
-        _ => None,
-    }
-}
-
 impl Decoder for ChunkCodec {
     type Item = Vec<u8>;
     type Error = AppError;
