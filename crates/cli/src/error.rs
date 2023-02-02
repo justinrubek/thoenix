@@ -16,6 +16,10 @@ pub enum AppError {
     // Application specific errors
     #[error("no data directory specified")]
     NoDataDir,
+    #[error("failed to parse length of chunk from bytes")]
+    ParseLengthBytes,
+    #[error("invalid chunk length")]
+    InvalidChunkLength,
 }
 
 pub type AppResult<T> = Result<T, AppError>;
