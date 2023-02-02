@@ -3,11 +3,11 @@ use russh::server::{Auth, Session};
 use russh_keys::PublicKeyBase64;
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     macros::support::Pin,
     sync::Mutex,
 };
-use tokio_util::codec::Framed;
+use tokio_util::codec::{Decoder, Encoder, Framed};
 use tracing::info;
 
 mod codec;
@@ -68,23 +68,29 @@ impl russh::server::Server for SshServer {
 
     fn new_client(&mut self, addr: Option<SocketAddr>) -> Self::Handler {
         info!(?addr, "new client");
-        SshSession::new(self.data_dir.clone())
+        SshSession {
+            clients: Arc::new(Mutex::new(HashMap::new())),
+            data_dir: self.data_dir.clone(),
+
+            input_buf: bytes::BytesMut::new(),
+            output_buf: bytes::BytesMut::new(),
+
+            codec: TextChunkCodec,
+        }
     }
 }
 
 struct SshSession {
     clients: Arc<Mutex<HashMap<russh::ChannelId, russh::Channel<russh::server::Msg>>>>,
     data_dir: PathBuf,
+
+    input_buf: bytes::BytesMut,
+    output_buf: bytes::BytesMut,
+
+    codec: TextChunkCodec,
 }
 
 impl SshSession {
-    fn new(data_dir: PathBuf) -> Self {
-        SshSession {
-            clients: Arc::new(Mutex::new(HashMap::new())),
-            data_dir,
-        }
-    }
-
     async fn get_channel(
         &mut self,
         channel_id: russh::ChannelId,
@@ -93,14 +99,32 @@ impl SshSession {
         clients.remove(&channel_id).unwrap()
     }
 
+    async fn write(&mut self, data: String) -> AppResult<()> {
+        self.codec.encode(data, &mut self.output_buf)
+    }
+
+    async fn flush(
+        &mut self,
+        session: &mut russh::server::Session,
+        channel_id: russh::ChannelId,
+    ) -> AppResult<()> {
+        session.data(
+            channel_id,
+            russh::CryptoVec::from_slice(&self.output_buf.split().as_ref()),
+        );
+
+        Ok(())
+    }
+
     /// Respond with one line for each reference we currently have
     /// The first line also haas a list of the server's capabilities
     /// The data is transmitted in chunks.
     /// Each chunk starts with a 4 character hex value specifying the length of the chunk (including the 4 character hex value)
     /// Chunks usually contain a single line of data and a trailing linefeed
-    #[tracing::instrument(skip(self, args))]
+    #[tracing::instrument(skip(self, args, session))]
     async fn receive_pack(
         &mut self,
+        session: &mut russh::server::Session,
         channel_id: russh::ChannelId,
         args: Vec<&str>,
     ) -> AppResult<()> {
@@ -125,8 +149,7 @@ impl SshSession {
                 .await?;
         }
 
-        let channel = self.get_channel(channel_id).await;
-        let stream = channel.into_stream();
+        let mut channel = self.get_channel(channel_id).await;
 
         // invoke git-receive-pack
         // send the output to the channel
@@ -140,29 +163,64 @@ impl SshSession {
         // tokio::io::copy_bidirectional(&mut child_process, &mut stream).await?;
         let child_process = ChildProcess { inner: child };
 
-        let mut client = Framed::new(child_process, TextChunkCodec);
-        let mut server = Framed::new(stream, TextChunkCodec);
+        let mut server = Framed::new(child_process, TextChunkCodec);
+        // read from stream, any input
 
         loop {
-            let chunk = client.try_next().await?;
+            let chunk = server.try_next().await?;
             info!(?chunk);
             if let Some(chunk) = chunk {
                 if chunk.is_empty() {
                     // Send the final empty chunk to indicate the end of the stream
-                    server.send(chunk).await?;
+                    self.write(chunk).await?;
                     break;
                 }
-                server.send(chunk).await?;
+                self.write(chunk).await?;
             }
         }
 
         info!("done reading from child process");
+        self.flush(session, channel_id).await?;
+
+        // Now, use the channel to receive data
+        let response = channel.wait().await.unwrap();
+        info!(?response);
 
         // collect stdout
         // let mut stdout = child.stdout.unwrap();
         // let mut output = Vec::new();
         // tokio::io::copy(&mut stdout, &mut output).await?;
         // info!(?output);
+
+        Ok(())
+    }
+
+    async fn cat(
+        &mut self,
+        session: &mut russh::server::Session,
+        channel_id: russh::ChannelId,
+    ) -> AppResult<()> {
+        info!("cat");
+
+        let child = tokio::process::Command::new("cat")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()?;
+
+        let channel = self.get_channel(channel_id).await;
+        let mut stream = channel.into_stream();
+
+        let mut buf = bytes::BytesMut::new();
+        loop {
+            info!("reading from channel");
+            // let chunk = channel.wait().await.ok_or_else(|| anyhow::anyhow!("channel closed"))?;
+            let chunk = stream.read(&mut buf).await?;
+            info!(?chunk, "read from channel");
+        }
+
+        self.flush(session, channel_id).await?;
+
+        // Now, use the channel to receive data
 
         Ok(())
     }
@@ -201,6 +259,8 @@ impl russh::server::Handler for SshSession {
         channel: russh::Channel<russh::server::Msg>,
         session: Session,
     ) -> AppResult<(Self, bool, Session)> {
+        let channel_id = channel.id();
+        info!(?channel_id, "channel open session");
         {
             let mut clients = self.clients.lock().await;
             clients.insert(channel.id(), channel);
@@ -227,15 +287,10 @@ impl russh::server::Handler for SshSession {
         data: &[u8],
         mut session: Session,
     ) -> AppResult<(Self, Session)> {
-        info!(?data, %channel_id, "exec request");
-        let msg = russh::ChannelMsg::Exec {
-            want_reply: true,
-            command: data.into(),
-        };
+        info!(%channel_id, "exec request");
         let command_str = String::from_utf8_lossy(data);
-        info!(?msg, %command_str, "sending exec request");
+        info!(%command_str, "sending exec request");
 
-        // TODO: check command to be invoked
         fn parse_command(command: &str) -> Option<(&str, Vec<&str>)> {
             let mut parts = command.split_whitespace();
             let command = parts.next()?;
@@ -246,15 +301,14 @@ impl russh::server::Handler for SshSession {
 
         match parse_command(&command_str) {
             Some(("git-receive-pack", args)) => {
-                let _res = self.receive_pack(channel_id, args).await?;
-
-                session.channel_success(channel_id);
-                Ok((self, session))
+                let _res = self.receive_pack(&mut session, channel_id, args).await?;
             }
             Some(("git-upload-pack", args)) => {
                 let _res = self.upload_pack(channel_id, args).await?;
-
-                Ok((self, session))
+            }
+            Some(("cat", _)) => {
+                let _res = self.cat(&mut session, channel_id).await?;
+                session.close(channel_id);
             }
             Some((other, _args)) => {
                 info!(%other, "unknown command");
@@ -262,16 +316,8 @@ impl russh::server::Handler for SshSession {
             }
             None => unimplemented!(),
         }
-    }
 
-    async fn data(
-        self,
-        _channel_id: russh::ChannelId,
-        data: &[u8],
-        _session: Session,
-    ) -> AppResult<(Self, Session)> {
-        info!(?data, "data");
-        todo!()
+        Ok((self, session))
     }
 }
 
@@ -320,7 +366,7 @@ async fn main() -> AppResult<()> {
     };
 
     let address = (
-        "127.0.0.10",
+        "127.0.0.0",
         std::env::var("PORT")
             .unwrap_or_else(|_| "2222".to_string())
             .parse()
