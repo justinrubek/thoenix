@@ -74,6 +74,7 @@ impl Encoder<Vec<u8>> for ChunkCodec {
     }
 }
 
+#[derive(Clone)]
 pub struct TextChunkCodec;
 
 impl Decoder for TextChunkCodec {

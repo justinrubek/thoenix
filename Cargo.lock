@@ -189,6 +189,7 @@ dependencies = [
  "bytes",
  "ed25519-dalek",
  "futures",
+ "futures-util",
  "russh",
  "russh-keys",
  "thiserror",
