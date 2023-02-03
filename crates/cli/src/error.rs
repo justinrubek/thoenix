@@ -16,12 +16,10 @@ pub enum AppError {
     // Application specific errors
     #[error("no data directory specified")]
     NoDataDir,
-    /* Codec errors, omitted in preparation to remove
     #[error("failed to parse length of chunk from bytes")]
     ParseLengthBytes,
     #[error("invalid chunk length")]
     InvalidChunkLength,
-    */
     #[error("missing child process")]
     MissingChild,
     #[error("unsupported command")]

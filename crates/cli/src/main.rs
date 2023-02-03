@@ -3,6 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use tokio::io::AsyncWriteExt;
 use tracing::info;
 
+mod codec;
 mod error;
 mod handler;
 
@@ -45,7 +46,7 @@ async fn main() -> AppResult<()> {
         auth_rejection_time: std::time::Duration::from_secs(3),
         auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
         keys: vec![keys],
-        connection_timeout: Some(std::time::Duration::from_secs(15)),
+        connection_timeout: Some(std::time::Duration::from_secs(30)),
         ..Default::default()
     };
 

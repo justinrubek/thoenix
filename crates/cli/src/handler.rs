@@ -1,11 +1,16 @@
-use crate::error::{self, AppResult};
+use crate::{
+    codec::TextChunkCodec,
+    error::{self, AppResult},
+};
+use futures_util::sink::SinkExt;
 use russh::server::{Auth, Session};
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     macros::support::Pin,
     sync::Mutex,
 };
+use tokio_util::codec::{Decoder, FramedWrite};
 use tracing::info;
 
 /// A thin wrapper around tokio::process::Child that implements AsyncRead
@@ -67,6 +72,9 @@ impl russh::server::Server for SshServer {
 
             child: None,
             child_stdin: None,
+
+            input_buf: bytes::BytesMut::new(),
+            codec: TextChunkCodec,
         }
     }
 }
@@ -77,6 +85,9 @@ pub(crate) struct SshSession {
 
     child: Option<tokio::task::JoinHandle<AppResult<()>>>,
     child_stdin: Option<tokio::process::ChildStdin>,
+
+    input_buf: bytes::BytesMut,
+    codec: TextChunkCodec,
 }
 
 impl SshSession {
@@ -100,7 +111,17 @@ impl SshSession {
         let mut child_stdout = child.stdout.unwrap();
 
         let task = tokio::spawn(async move {
-            tokio::io::copy(&mut child_stdout, &mut channel.into_stream()).await?;
+            // tokio::io::copy(&mut child_stdout, &mut channel.into_stream()).await?;
+            let mut stream = channel.into_stream();
+            loop {
+                let mut buf = [0u8; 1024];
+                let n = child_stdout.read(&mut buf).await?;
+                if n == 0 {
+                    break;
+                }
+                info!(?n, "read");
+                stream.write_all(&buf[..n]).await?;
+            }
             Ok::<_, error::AppError>(())
         });
         self.child = Some(task);
@@ -236,24 +257,48 @@ impl russh::server::Handler for SshSession {
         mut self,
         channel_id: russh::ChannelId,
         data: &[u8],
-        session: russh::server::Session,
+        mut session: russh::server::Session,
     ) -> AppResult<(Self, russh::server::Session)> {
         tracing::info!(%channel_id, "data");
+        self.input_buf.extend_from_slice(data);
 
         let child_stdin = self
             .child_stdin
             .as_mut()
             .ok_or_else(|| error::AppError::MissingChild)?;
-        child_stdin.write_all(data).await?;
+
+        // child_stdin.write_all(&data).await?;
+        let mut child_stdin = FramedWrite::new(child_stdin, self.codec.clone());
+
+        while let Some(frame) = self.codec.decode(&mut self.input_buf)? {
+            if frame.is_empty() {
+                // session.exit_status_request(channel_id, 0);
+                // session.eof(channel_id);
+                // session.close(channel_id);
+                info!("client closed connection");
+                return Ok((self, session));
+            }
+
+            child_stdin.send(frame).await?;
+        }
+        /*
+         */
 
         Ok((self, session))
     }
 
-    async fn disconnected(
-        self,
+    /*
+    async fn channel_eof(
+        mut self,
+        channel_id: russh::ChannelId,
         session: russh::server::Session,
     ) -> AppResult<(Self, russh::server::Session)> {
-        info!("disconnected");
+        info!(%channel_id, "channel eof");
+        let child = self.child.take().ok_or_else(|| error::AppError::MissingChild)?;
+
+        child.abort();
+
         Ok((self, session))
     }
+    */
 }
