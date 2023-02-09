@@ -12,6 +12,8 @@ pub enum AppError {
     FromUtf8(#[from] std::string::FromUtf8Error),
     #[error(transparent)]
     Ed25519(#[from] ed25519_dalek::ed25519::Error),
+    #[error(transparent)]
+    GitPackDataInit(#[from] git_pack::data::init::Error),
 
     // Application specific errors
     #[error("no data directory specified")]

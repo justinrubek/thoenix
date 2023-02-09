@@ -1,5 +1,5 @@
 use crate::{
-    codec::TextChunkCodec,
+    codec::{GitCodec, GitMessage},
     error::{self, AppResult},
 };
 use futures_util::sink::SinkExt;
@@ -74,7 +74,9 @@ impl russh::server::Server for SshServer {
             child_stdin: None,
 
             input_buf: bytes::BytesMut::new(),
-            codec: TextChunkCodec,
+            codec: GitCodec::new(),
+
+            finished_initial: false,
         }
     }
 }
@@ -87,7 +89,9 @@ pub(crate) struct SshSession {
     child_stdin: Option<tokio::process::ChildStdin>,
 
     input_buf: bytes::BytesMut,
-    codec: TextChunkCodec,
+    codec: GitCodec,
+
+    finished_initial: bool,
 }
 
 impl SshSession {
@@ -170,8 +174,21 @@ impl SshSession {
         let mut child_stdout = child.stdout.unwrap();
 
         let task = tokio::spawn(async move {
-            tokio::io::copy(&mut child_stdout, &mut channel.into_stream()).await?;
-            Ok::<_, error::AppError>(())
+            // tokio::io::copy(&mut child_stdout, &mut channel.into_stream()).await?;
+            let mut stream = channel.into_stream();
+            loop {
+                let mut buf = [0u8; 1024];
+                let n = child_stdout.read(&mut buf).await?;
+                if n == 0 {
+                    continue;
+                }
+                stream.write_all(&buf[..n]).await?;
+                // print data as text
+                let text = std::str::from_utf8(&buf[..n]).unwrap();
+                info!(?text, "read from child");
+
+                todo!();
+            }
         });
         self.child = Some(task);
 
@@ -257,7 +274,7 @@ impl russh::server::Handler for SshSession {
         mut self,
         channel_id: russh::ChannelId,
         data: &[u8],
-        mut session: russh::server::Session,
+        session: russh::server::Session,
     ) -> AppResult<(Self, russh::server::Session)> {
         tracing::info!(%channel_id, "data");
         self.input_buf.extend_from_slice(data);
@@ -267,22 +284,36 @@ impl russh::server::Handler for SshSession {
             .as_mut()
             .ok_or_else(|| error::AppError::MissingChild)?;
 
-        // child_stdin.write_all(&data).await?;
+        // print input buffer as text
+        /*
+        let input = String::from_utf8_lossy(&self.input_buf);
+        info!(%input, "input buffer");
+        self.input_buf.clear();
+
+        child_stdin.write_all(&data).await?;
+        */
+
         let mut child_stdin = FramedWrite::new(child_stdin, self.codec.clone());
 
         while let Some(frame) = self.codec.decode(&mut self.input_buf)? {
-            if frame.is_empty() {
-                // session.exit_status_request(channel_id, 0);
-                // session.eof(channel_id);
-                // session.close(channel_id);
-                info!("client closed connection");
-                return Ok((self, session));
-            }
+            match frame {
+                GitMessage::Data(_) => {
+                    tracing::info!("received data");
+                }
+                GitMessage::PackData(_) => {
+                    tracing::info!("packdata");
+                }
+            };
 
+            info!(?frame, "sending frame to child");
             child_stdin.send(frame).await?;
+            self.input_buf.clear();
+
+            if self.finished_initial {
+                // info!("finished initial exchange");
+                break;
+            }
         }
-        /*
-         */
 
         Ok((self, session))
     }
