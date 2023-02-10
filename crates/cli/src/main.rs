@@ -16,6 +16,7 @@ impl ThoenixServer {
     }
 
     /// experimental ssh server, functionality is not complete
+    #[allow(dead_code)]
     async fn ssh_server(self) -> AppResult<()> {
         let data_dir = self.data_dir.to_str().unwrap();
 
@@ -49,6 +50,19 @@ impl ThoenixServer {
 
         Ok(())
     }
+
+    async fn http_server(self) -> AppResult<()> {
+        let server = thoenix_http::Server::new(self.data_dir);
+
+        let port = std::env::var("PORT")
+            .unwrap_or_else(|_| "3000".to_string())
+            .parse()
+            .unwrap();
+
+        server.run(port).await?;
+
+        Ok(())
+    }
 }
 
 #[tokio::main]
@@ -60,7 +74,7 @@ async fn main() -> AppResult<()> {
     // TODO: ensure data_dir exists
 
     let server = ThoenixServer::new(data_dir.into());
-    server.ssh_server().await?;
+    server.http_server().await?;
 
     Ok(())
 }

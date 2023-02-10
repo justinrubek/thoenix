@@ -21,6 +21,8 @@ pub enum AppError {
 
     #[error(transparent)]
     SshError(#[from] thoenix_ssh::error::Error),
+    #[error(transparent)]
+    HttpError(#[from] thoenix_http::error::Error),
 }
 
 pub type AppResult<T> = Result<T, AppError>;
