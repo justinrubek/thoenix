@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum AppError {
+pub enum Error {
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
     #[error(transparent)]
@@ -18,9 +18,14 @@ pub enum AppError {
     // Application specific errors
     #[error("no data directory specified")]
     NoDataDir,
-
-    #[error(transparent)]
-    SshError(#[from] thoenix_ssh::error::Error),
+    #[error("failed to parse length of chunk from bytes")]
+    ParseLengthBytes,
+    #[error("invalid chunk length")]
+    InvalidChunkLength,
+    #[error("missing child process")]
+    MissingChild,
+    #[error("unsupported command")]
+    UnsupportedCommand,
 }
 
-pub type AppResult<T> = Result<T, AppError>;
+pub type Result<T> = std::result::Result<T, Error>;
