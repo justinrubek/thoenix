@@ -3,7 +3,7 @@ use bytes::Buf;
 use std::io::Read;
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::error::{AppError, AppResult};
+use crate::error::{Error, Result};
 
 /// git protocol encoder/decoder
 struct ChunkCodec;
@@ -74,7 +74,7 @@ struct EntryData {
 }
 
 impl EntryData {
-    fn try_decode(data: &[u8]) -> AppResult<Self> {
+    fn try_decode(data: &[u8]) -> Result<Self> {
         let mut decoder = flate2::read::ZlibDecoder::new(data);
         let mut uncompressed = Vec::new();
         decoder.read_to_end(&mut uncompressed)?;
@@ -87,7 +87,7 @@ impl EntryData {
         })
     }
 
-    fn bruteforce_decode(data: &[u8]) -> AppResult<Option<Self>> {
+    fn bruteforce_decode(data: &[u8]) -> Result<Option<Self>> {
         // Since we don't have an index for this pack, we need to try to decode the entry
         // We start with a single byte and brute-force until it succeeds
         tracing::info!("bruteforcing pack entry");
@@ -153,9 +153,9 @@ pub(crate) enum GitMessage {
 
 impl Decoder for GitCodec {
     type Item = GitMessage;
-    type Error = AppError;
+    type Error = Error;
 
-    fn decode(&mut self, buffer: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    fn decode(&mut self, buffer: &mut bytes::BytesMut) -> Result<Option<Self::Item>> {
         if buffer.len() < CHUNK_LENGTH_BYTES {
             return Ok(None);
         }
@@ -174,10 +174,10 @@ impl Decoder for GitCodec {
             Ok(Some(GitMessage::PackData(data.to_vec())))
         } else {
             let chunk_len = usize::from_str_radix(
-                std::str::from_utf8(&len_bytes).map_err(|_| AppError::ParseLengthBytes)?,
+                std::str::from_utf8(&len_bytes).map_err(|_| Error::ParseLengthBytes)?,
                 16,
             )
-            .map_err(|_| AppError::InvalidChunkLength)?;
+            .map_err(|_| Error::InvalidChunkLength)?;
 
             tracing::info!(?chunk_len, "decode");
 
@@ -202,7 +202,7 @@ impl Decoder for GitCodec {
             // the length includes the length bytes themselves, so subtract them
             let chunk_len = chunk_len
                 .checked_sub(CHUNK_LENGTH_BYTES)
-                .ok_or_else(|| AppError::Anyhow(anyhow::anyhow!("invalid chunk length")))?;
+                .ok_or_else(|| Error::Anyhow(anyhow::anyhow!("invalid chunk length")))?;
 
             // check if the entire chunk is in the buffer
             if buffer.len() < chunk_len + CHUNK_LENGTH_BYTES {
@@ -225,9 +225,9 @@ impl Decoder for GitCodec {
 }
 
 impl Encoder<GitMessage> for GitCodec {
-    type Error = AppError;
+    type Error = Error;
 
-    fn encode(&mut self, item: GitMessage, buf: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: GitMessage, buf: &mut bytes::BytesMut) -> Result<()> {
         match item {
             GitMessage::Data(data) => {
                 if data.is_empty() {

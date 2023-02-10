@@ -234,6 +234,7 @@ dependencies = [
  "russh",
  "russh-keys",
  "thiserror",
+ "thoenix-ssh",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1435,6 +1436,27 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "thoenix-ssh"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "ed25519-dalek",
+ "flate2",
+ "futures",
+ "futures-util",
+ "git-pack",
+ "russh",
+ "russh-keys",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

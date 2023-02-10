@@ -1,6 +1,6 @@
 use crate::{
     codec::{GitCodec, GitMessage},
-    error::{self, AppResult},
+    error::{self, Result},
 };
 use futures_util::sink::SinkExt;
 use russh::server::{Auth, Session};
@@ -57,7 +57,7 @@ impl AsyncWrite for ChildProcess {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct SshServer {
+pub struct SshServer {
     pub data_dir: PathBuf,
 }
 
@@ -81,11 +81,11 @@ impl russh::server::Server for SshServer {
     }
 }
 
-pub(crate) struct SshSession {
+pub struct SshSession {
     clients: Arc<Mutex<HashMap<russh::ChannelId, russh::Channel<russh::server::Msg>>>>,
     data_dir: PathBuf,
 
-    child: Option<tokio::task::JoinHandle<AppResult<()>>>,
+    child: Option<tokio::task::JoinHandle<Result<()>>>,
     child_stdin: Option<tokio::process::ChildStdin>,
 
     input_buf: bytes::BytesMut,
@@ -103,7 +103,7 @@ impl SshSession {
         clients.remove(&channel_id).unwrap()
     }
 
-    async fn cat(&mut self, channel_id: russh::ChannelId) -> AppResult<()> {
+    async fn cat(&mut self, channel_id: russh::ChannelId) -> Result<()> {
         let child = tokio::process::Command::new("cat")
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
@@ -126,18 +126,14 @@ impl SshSession {
                 info!(?n, "read");
                 stream.write_all(&buf[..n]).await?;
             }
-            Ok::<_, error::AppError>(())
+            Ok::<_, error::Error>(())
         });
         self.child = Some(task);
 
         Ok(())
     }
 
-    async fn receive_pack(
-        &mut self,
-        channel_id: russh::ChannelId,
-        args: Vec<&str>,
-    ) -> AppResult<()> {
+    async fn receive_pack(&mut self, channel_id: russh::ChannelId, args: Vec<&str>) -> Result<()> {
         info!(?args, ?self.data_dir, "git-receive-pack");
         // First, determine the repository name and path
         // We need to clean up the text from the url and make it a relative path to the data directory
@@ -198,9 +194,9 @@ impl SshSession {
 
 #[async_trait::async_trait]
 impl russh::server::Handler for SshSession {
-    type Error = error::AppError;
+    type Error = error::Error;
 
-    async fn auth_password(self, user: &str, password: &str) -> AppResult<(Self, Auth)> {
+    async fn auth_password(self, user: &str, password: &str) -> Result<(Self, Auth)> {
         info!(?user, ?password, "auth password");
         Ok((self, Auth::Accept))
     }
@@ -209,7 +205,7 @@ impl russh::server::Handler for SshSession {
         self,
         user: &str,
         public_key: &russh_keys::key::PublicKey,
-    ) -> AppResult<(Self, Auth)> {
+    ) -> Result<(Self, Auth)> {
         info!(%user, ?public_key, "auth public key");
         Ok((self, Auth::Accept))
     }
@@ -218,7 +214,7 @@ impl russh::server::Handler for SshSession {
         mut self,
         channel: russh::Channel<russh::server::Msg>,
         session: Session,
-    ) -> AppResult<(Self, bool, Session)> {
+    ) -> Result<(Self, bool, Session)> {
         let channel_id = channel.id();
         info!(?channel_id, "channel open session");
         {
@@ -236,7 +232,7 @@ impl russh::server::Handler for SshSession {
         channel_id: russh::ChannelId,
         data: &[u8],
         mut session: Session,
-    ) -> AppResult<(Self, Session)> {
+    ) -> Result<(Self, Session)> {
         info!(%channel_id, "exec request");
         let command_str = String::from_utf8_lossy(data);
         info!(%command_str, "sending exec request");
@@ -255,12 +251,12 @@ impl russh::server::Handler for SshSession {
             Some((other, _args)) => {
                 tracing::warn!(%other, "unknown command");
                 session.channel_failure(channel_id);
-                Err(error::AppError::UnsupportedCommand)
+                Err(error::Error::UnsupportedCommand)
             }
             None => {
                 tracing::warn!("no command");
                 session.channel_failure(channel_id);
-                Err(error::AppError::UnsupportedCommand)
+                Err(error::Error::UnsupportedCommand)
             }
         }?;
 
@@ -275,14 +271,14 @@ impl russh::server::Handler for SshSession {
         channel_id: russh::ChannelId,
         data: &[u8],
         session: russh::server::Session,
-    ) -> AppResult<(Self, russh::server::Session)> {
+    ) -> Result<(Self, russh::server::Session)> {
         tracing::info!(%channel_id, "data");
         self.input_buf.extend_from_slice(data);
 
         let child_stdin = self
             .child_stdin
             .as_mut()
-            .ok_or_else(|| error::AppError::MissingChild)?;
+            .ok_or_else(|| error::Error::MissingChild)?;
 
         // print input buffer as text
         /*
@@ -323,9 +319,9 @@ impl russh::server::Handler for SshSession {
         mut self,
         channel_id: russh::ChannelId,
         session: russh::server::Session,
-    ) -> AppResult<(Self, russh::server::Session)> {
+    ) -> Result<(Self, russh::server::Session)> {
         info!(%channel_id, "channel eof");
-        let child = self.child.take().ok_or_else(|| error::AppError::MissingChild)?;
+        let child = self.child.take().ok_or_else(|| error::Error::MissingChild)?;
 
         child.abort();
 
