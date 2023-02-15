@@ -39,6 +39,9 @@ impl Server {
             repo_path: self.data_dir.clone(),
         });
 
+        // TODO: Attempt to implement the `git-receive-pack` route but without calling into
+        // git. This could potentially be done using `git_pack::data::entry::Entry` to parse
+        // the file and `git_odn` to write? The method to implement is not clear yet.
         let app = Router::new()
             .route("/", get(root))
             // .route("/configs/:owner/:repo.git/info/refs", get(list_refs_child))
