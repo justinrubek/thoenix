@@ -5,14 +5,15 @@ use axum::{
     Router,
 };
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc};
+use tokio::io::AsyncWriteExt;
 use tokio_util::codec::Encoder;
-use tracing::info;
+use tracing::{debug, info};
 
 pub mod codec;
 pub mod error;
 pub mod message;
 
-use error::Result;
+use error::{Error, Result};
 use message::GitCodec;
 
 pub struct ServerState {
@@ -63,19 +64,16 @@ async fn root() -> &'static str {
 }
 
 // Generate a response for git-receive-pack using the `git` executable
-async fn _list_refs_child(
+#[allow(dead_code)]
+async fn list_refs_child(
     State(app_state): State<Arc<ServerState>>,
     Path((owner, repo)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
-    payload: Bytes,
 ) -> Result<impl axum::response::IntoResponse> {
-    info!("Received data from {}/{}", owner, repo);
-    info!("Payload: {:?}", payload);
-
-    // We need to respond with the results for `git receive-pack` to work
+    info!("Received data for {}/{}", owner, repo);
 
     let service = query.get("service").ok_or(error::Error::MissingService)?;
-    info!("Service: {}", service);
+    info!(?service);
 
     // determine the path to the repo
     let repo_path = app_state.repo_path.join(owner).join(repo);
@@ -96,9 +94,11 @@ async fn _list_refs_child(
         &mut buf,
     )?;
     codec.encode(message::GitMessage::Flush, &mut buf)?;
+
+    // With the header finished, just return all the data from the child process
     buf.extend_from_slice(&child.stdout);
 
-    info!(?buf, "Encoded data");
+    debug!(?buf, "Encoded data");
 
     Ok((
         [
@@ -113,19 +113,16 @@ async fn _list_refs_child(
 }
 
 /// Generate a response for git-receive-pack using git2
+#[allow(dead_code)]
 async fn list_refs(
     State(app_state): State<Arc<ServerState>>,
     Path((owner, repo)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
-    payload: Bytes,
 ) -> Result<impl axum::response::IntoResponse> {
-    info!("Received data from {}/{}", owner, repo);
-    info!("Payload: {:?}", payload);
-
-    // We need to respond with the results for `git receive-pack` to work
+    debug!("Received data for {}/{}", owner, repo);
 
     let service = query.get("service").ok_or(error::Error::MissingService)?;
-    info!("Service: {}", service);
+    debug!(?service);
 
     // determine the path to the repo
     let repo_path = app_state.repo_path.join(owner).join(repo);
@@ -133,50 +130,57 @@ async fn list_refs(
 
     // generate the ref response the client needs
     let mut buf = bytes::BytesMut::new();
-    let mut ref_codec = GitCodec;
+    let mut codec = GitCodec;
 
     let refs = repo.references()?;
-    let refs = refs
+    // format the references how git wants them - the reference hash and the reference name
+    let mut refs = refs
         .into_iter()
         .filter_map(|r| r.ok())
-        .map(|r| r.name().unwrap().to_owned())
+        .map(|r| {
+            let target = r.target().unwrap().to_string();
+            let name = r.name().unwrap();
+
+            let mut buf = bytes::BytesMut::new();
+            buf.extend_from_slice(target.as_ref());
+            buf.extend_from_slice(b" ");
+            buf.extend_from_slice(name.as_ref());
+
+            buf
+        })
         .collect::<Vec<_>>();
 
-    // TODO: capabilities
-    ref_codec.encode(
+    codec.encode(
         message::GitMessage::ServiceHeader(message::GitService::ReceivePack),
         &mut buf,
     )?;
-    ref_codec.encode(message::GitMessage::Flush, &mut buf)?;
+    codec.encode(message::GitMessage::Flush, &mut buf)?;
 
+    // We need to attach capabilities to the first ref
     let capabilities =
-        b" capabilities\0report-status delete-refs side-band-64k quiet ofs-delta agent=git/thoenix";
+        b"\0report-status report-status-v2 delete-refs side-band-64k quiet atomic ofs-delta object-format=sha1 agent=git/thoenix";
+    // If there are no refs, we need to add a dummy ref representing a "null sha1"
     let empty_sha = b"0000000000000000000000000000000000000000";
+
     if refs.is_empty() {
         let mut data = bytes::BytesMut::new();
         data.extend_from_slice(empty_sha);
         data.extend_from_slice(capabilities);
-        ref_codec.encode(message::GitMessage::Data(data.split().to_vec()), &mut buf)?;
-
-        ref_codec.encode(message::GitMessage::Flush, &mut buf)?;
+        codec.encode(message::GitMessage::Data(data.split().to_vec()), &mut buf)?;
     } else {
-        refs.iter().enumerate().for_each(|(i, r)| {
-            let mut data = bytes::BytesMut::from(r.as_bytes());
-            // include capabilities with the first ref
+        refs.iter_mut().enumerate().try_for_each(|(i, r)| {
             if i == 0 {
-                data.extend_from_slice(capabilities);
+                r.extend_from_slice(capabilities);
             }
 
-            ref_codec
-                .encode(message::GitMessage::Data(data.to_vec()), &mut buf)
-                .unwrap();
-        });
-    }
-    ref_codec
-        .encode(message::GitMessage::Flush, &mut buf)
-        .unwrap();
+            codec.encode(message::GitMessage::Data(r.to_vec()), &mut buf)?;
 
-    info!(?refs, ?repo_path, ?buf);
+            Ok::<(), Error>(())
+        })?;
+    }
+    codec.encode(message::GitMessage::Flush, &mut buf).unwrap();
+
+    debug!(?refs, ?repo_path, ?buf);
 
     Ok((
         [
@@ -191,10 +195,30 @@ async fn list_refs(
 }
 
 async fn receive_pack(
-    State(_app_state): State<Arc<ServerState>>,
+    State(app_state): State<Arc<ServerState>>,
     Path((owner, repo)): Path<(String, String)>,
-    _payload: Bytes,
-) -> Result<()> {
+    payload: Bytes,
+) -> Result<Bytes> {
     info!(%owner, %repo, "Received send-pack data");
-    todo!()
+    let len = payload.len();
+    info!(?len);
+
+    let repo_path = app_state.repo_path.join(owner).join(repo);
+
+    // invoke git-receive-pack and pipe the payload to it
+    let mut child = tokio::process::Command::new("git")
+        .arg("receive-pack")
+        .arg(&repo_path)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()?;
+
+    let mut stdin = child.stdin.take().unwrap();
+    stdin.write_all(&payload).await?;
+
+    let output = child.wait_with_output().await?;
+
+    info!(?output);
+
+    Ok(bytes::Bytes::from(output.stdout))
 }
