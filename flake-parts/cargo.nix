@@ -21,13 +21,13 @@
       # misc
     ];
 
-    extraBuildInputs = [
-      pkgs.pkg-config
-    ];
     extraNativeBuildInputs = [
+      pkgs.pkg-config
+      pkgs.openssl
+      pkgs.openssl.dev
     ];
 
-    allBuildInputs = base: base ++ extraBuildInputs;
+    # allBuildInputs = base: base ++ extraBuildInputs;
     allNativeBuildInputs = base: base ++ extraNativeBuildInputs;
 
     fenix-channel = inputs'.fenix.packages.latest;
@@ -55,9 +55,8 @@
 
       pname = "thoenix";
 
-      buildInputs = allBuildInputs [];
       nativeBuildInputs = allNativeBuildInputs [];
-      LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
+      LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeBuildInputs;
     };
     deps-only = craneLib.buildDepsOnly ({} // common-build-args);
 
@@ -95,9 +94,8 @@
       // common-build-args);
   in rec {
     devShells.default = pkgs.mkShell rec {
-      buildInputs = allBuildInputs [fenix-toolchain] ++ devTools;
-      nativeBuildInputs = allNativeBuildInputs [];
-      LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
+      packages = allNativeBuildInputs [fenix-toolchain] ++ devTools;
+      LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath packages;
       inherit (self.checks.${system}.pre-commit-hooks) shellHook;
     };
 

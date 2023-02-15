@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.68"
 axum = "0.6.4"
+bytes = "1.4.0"
 futures = "0.3.26"
 futures-util = "0.3.26"
+git2 = "0.16.1"
 hyper = "0.14.24"
 thiserror = "1.0.38"
 # clap = { version = "4.0.19", features = ["derive"] }
@@ -17,7 +19,7 @@ thiserror = "1.0.38"
 # serde = { version = "1", features = ["derive"] }
 # serde_json = "1.0.87"
 tokio = { version = "1", features = ["full"] }
-# tokio-util = { version = "0.7.4", features = ["codec"] }
+tokio-util = { version = "0.7.4", features = ["codec"] }
 tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.3.0", features = ["fs", "cors"] }
 tracing = "0.1.37"
