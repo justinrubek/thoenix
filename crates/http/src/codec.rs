@@ -1,7 +1,6 @@
 use crate::error::{Error, Result};
 use bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
-use tracing::info;
 
 pub(crate) struct PktLineCodec;
 
@@ -36,7 +35,6 @@ impl Decoder for PktLineCodec {
     type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>> {
-        info!(?buf);
         if buf.len() < 4 {
             return Ok(None);
         }

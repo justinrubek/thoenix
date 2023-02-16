@@ -1,7 +1,7 @@
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    Hyper(hyper::Error),
+    Hyper(#[from] hyper::Error),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -11,12 +11,6 @@ pub enum Error {
     MissingService,
     #[error("Unable to parse length bytes")]
     ParseLengthBytes,
-}
-
-impl std::convert::From<hyper::Error> for Error {
-    fn from(e: hyper::Error) -> Self {
-        Error::Hyper(e)
-    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
