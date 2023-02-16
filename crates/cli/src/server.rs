@@ -13,7 +13,6 @@ impl Server {
     }
 
     /// experimental ssh server, functionality is not complete
-    #[allow(dead_code)]
     pub(crate) async fn ssh_server(self) -> AppResult<()> {
         let data_dir = self.data_dir.to_str().unwrap();
 
