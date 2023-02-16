@@ -22,6 +22,8 @@ pub enum AppError {
 
     #[error("invalid args: {0}")]
     InvalidArgs(String),
+    #[error("terraform error: {0}")]
+    TerraformError(i32),
 }
 
 pub type AppResult<T> = Result<T, AppError>;

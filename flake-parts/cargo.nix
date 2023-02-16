@@ -19,6 +19,7 @@
       rustfmt
       cargo-nextest
       # misc
+      pkgs.terraform
     ];
 
     extraNativeBuildInputs = [
