@@ -7,7 +7,7 @@ pub(crate) struct Args {
 
 #[derive(clap::Subcommand, Debug)]
 pub(crate) enum Commands {
-    /// commands for running the scheduling server
+    /// commands for running the server
     Server(Server),
     /// commands for interacting with terraform
     Terraform(Terraform),
