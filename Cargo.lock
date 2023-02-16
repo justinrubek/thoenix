@@ -316,30 +316,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "clap",
- "ed25519-dalek",
- "flate2",
- "futures",
- "futures-util",
- "git-pack",
- "russh",
- "russh-keys",
- "thiserror",
- "thoenix-http",
- "thoenix-ssh",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "cpufeatures"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1929,6 +1905,30 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "thoenix"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "clap",
+ "ed25519-dalek",
+ "flate2",
+ "futures",
+ "futures-util",
+ "git-pack",
+ "russh",
+ "russh-keys",
+ "thiserror",
+ "thoenix-http",
+ "thoenix-ssh",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

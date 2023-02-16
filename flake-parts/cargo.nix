@@ -88,9 +88,9 @@
     };
 
     cli-package = craneLib.buildPackage ({
-        pname = "cli";
+        pname = "thoenix";
         cargoArtifacts = deps-only;
-        cargoExtraArgs = "--bin cli";
+        cargoExtraArgs = "--bin thoenix";
       }
       // common-build-args);
   in rec {
@@ -109,7 +109,7 @@
     apps = {
       cli = {
         type = "app";
-        program = "${self.packages.${system}.cli}/bin/cli";
+        program = "${self.packages.${system}.cli}/bin/thoenix";
       };
       default = apps.cli;
     };
