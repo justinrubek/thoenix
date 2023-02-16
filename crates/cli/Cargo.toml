@@ -15,7 +15,7 @@ git-pack = "0.30.1"
 russh = "0.36.0"
 russh-keys = "0.24.0"
 thiserror = "1.0.38"
-# clap = { version = "4.0.19", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
 # reqwest = { version = "0.11.12", features = ["rustls-tls"] }
 # serde = { version = "1", features = ["derive"] }
 # serde_json = "1.0.87"

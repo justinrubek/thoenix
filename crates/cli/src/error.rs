@@ -15,14 +15,13 @@ pub enum AppError {
     #[error(transparent)]
     GitPackDataInit(#[from] git_pack::data::init::Error),
 
-    // Application specific errors
-    #[error("no data directory specified")]
-    NoDataDir,
-
     #[error(transparent)]
     SshError(#[from] thoenix_ssh::error::Error),
     #[error(transparent)]
     HttpError(#[from] thoenix_http::error::Error),
+
+    #[error("invalid args: {0}")]
+    InvalidArgs(String),
 }
 
 pub type AppResult<T> = Result<T, AppError>;
