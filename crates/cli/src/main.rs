@@ -4,6 +4,7 @@ use tracing::info;
 mod commands;
 mod error;
 mod server;
+mod terraform;
 
 use commands::{Commands, ServerCommands};
 use error::AppResult;
@@ -26,30 +27,14 @@ async fn main() -> AppResult<()> {
             }
         }
         Commands::Terraform(terraform) => {
-            let (workspace, args) = terraform
-                .args
-                .split_first()
-                .ok_or_else(|| error::AppError::InvalidArgs("no terraform args".to_string()))?;
-
-            // read all args and print them
-            info!(?workspace, ?args, "spawning terraform command");
-
-            // Call the terraform executable with the provided args
-            // The workspace will determine the directory to run terraform in (using the -chdir flag)
-            // The args will be passed to terraform as-is
-            let mut terraform = tokio::process::Command::new("terraform")
-                .arg(format!("-chdir={workspace}"))
-                .args(args)
-                .spawn()?;
-
-            // From here, let the process take over. Display the output from it, both stdout and stderr
+            let mut terraform = terraform.spawn_command().await?;
             let status = terraform.wait().await?;
             info!(?status);
 
             // If the process exited with a non-zero exit code, return an error
             if !status.success() {
-                let code = status.code();
-                return Err(error::AppError::TerraformError(code.expect("no exit code")));
+                let code = status.code().expect("no exit code");
+                return Err(error::AppError::TerraformError(code));
             }
         }
     }

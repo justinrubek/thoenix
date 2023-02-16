@@ -1920,6 +1920,7 @@ dependencies = [
  "futures",
  "futures-util",
  "git-pack",
+ "git2",
  "russh",
  "russh-keys",
  "thiserror",

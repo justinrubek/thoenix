@@ -7,9 +7,11 @@ pub(crate) struct Args {
 
 #[derive(clap::Subcommand, Debug)]
 pub(crate) enum Commands {
-    /// commands for running the server
+    /// commands for running the git server
     Server(Server),
-    /// commands for interacting with terraform
+    /// commands for interacting with terraform.
+    ///
+    /// terraform will be invoked in the specified workspace's directory with the remaining arguments passed as-is,
     Terraform(Terraform),
 }
 
@@ -33,7 +35,10 @@ pub(crate) enum ServerCommands {
 
 #[derive(clap::Args, Debug)]
 pub(crate) struct Terraform {
-    // capture all args passed in to a single string
     #[arg()]
+    /// the name of the terraform configuration to use
+    pub configuration_name: String,
+    #[arg()]
+    /// the arguments to pass to terraform
     pub args: Vec<String>,
 }
