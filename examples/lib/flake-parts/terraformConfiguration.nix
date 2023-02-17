@@ -4,7 +4,7 @@
   lib,
   ...
 }: {
-  imports = [ ];
+  imports = [];
 
   perSystem = {
     self',
@@ -33,10 +33,10 @@
     # the output of `buildTerraformConfigurations` is a set, so we can just use attrNames
     terraformConfigurationNames = builtins.attrNames finalConfigurations;
 
-    # rename all values from finalConfigurations to be prefixed with `terraformConfiguration_`
+    # rename all values from finalConfigurations to be prefixed with `terraformConfiguration/`
     # this allows them to be specified in the `packages` flake output
     terraformConfigurationOutput = let
-      prefix = "terraformConfiguration_";
+      prefix = "terraformConfiguration/";
       reducer = l: r: l // {"${prefix}${r}" = finalConfigurations.${r};};
     in
       builtins.foldl' reducer {} terraformConfigurationNames;
