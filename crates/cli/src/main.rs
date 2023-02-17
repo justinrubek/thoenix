@@ -1,5 +1,4 @@
 use clap::Parser;
-use tracing::info;
 
 mod commands;
 mod error;
@@ -29,9 +28,7 @@ async fn main() -> AppResult<()> {
         Commands::Terraform(terraform) => {
             let mut terraform = terraform.spawn_command().await?;
             let status = terraform.wait().await?;
-            info!(?status);
 
-            // If the process exited with a non-zero exit code, return an error
             if !status.success() {
                 let code = status.code().expect("no exit code");
                 return Err(error::AppError::TerraformError(code));
