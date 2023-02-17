@@ -17,38 +17,6 @@
     inputs',
     ...
   }: let
-    # alias the terraform command to execute within the proper directory
-    terraform-command = let
-      jq = "${pkgs.jq}/bin/jq";
-      terraform-cli = "${self'.packages.terraform}/bin/terraform";
-    in
-      pkgs.writeShellScriptBin "tnix" ''
-        set -euo pipefail
-        # accept the configuration name as the first argument
-        # use it to add a -chdir=''${configurationPath} argument to the terraform command
-
-        # get the configuration name
-        configurationName="$1"
-        shift
-
-        # navigate to the top-level directory before executing the terraform command
-        pushd $(git rev-parse --show-toplevel)
-
-        # determine the path to the configuration
-        configurationPath=$(cat ${self'.packages.terraformConfigurationMatrix}/terraform-configuration-matrix.json | ${jq} -r '.configurations[] | select(.name == "'$configurationName'" ) | .path')
-
-        # copy the generated terraform configuration to the configuration path
-        cp "$configurationPath/config.tf.json" ./terraform/configurations/$configurationName/config.tf.json
-        # make it writable since it is read-only in the nix store
-        chmod +w ./terraform/configurations/$configurationName/config.tf.json
-
-        # execute the terraform command
-        ${terraform-cli} -chdir=./terraform/configurations/$configurationName "$@"
-
-        # return to the original directory
-        popd
-      '';
-
     # push the current configuration to terraform cloud
     # this is useful for doing API-driven terraform runs
     # https://developer.hashicorp.com/terraform/cloud-docs/run/api#pushing-a-new-configuration-version
@@ -103,7 +71,7 @@
         trap __cleanup EXIT
 
         # place the configuration's directory into a tarball
-        nix build .#terraformConfiguration_$configurationName
+        nix build .#terraformConfiguration/$configurationName
         tar -zcvf $file_name -C ./result .
 
         # lookup the workspace id
@@ -134,9 +102,9 @@
   in rec {
     devShells.default = pkgs.mkShell {
       buildInputs = [
-        terraform-command
-        push-configuration
+        inputs'.thoenix.packages.cli
         self'.packages.terraform
+        push-configuration
       ];
       shellHook = ''
         ${config.pre-commit.installationScript}
