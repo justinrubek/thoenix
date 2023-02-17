@@ -8,6 +8,8 @@ Any `.nix` files included will be built into JSON using terranix and included in
 
 # getting started
 
+## quickstart
+
 You may use one of the templates to get started:
 
 Initialize in the current directory:
@@ -18,14 +20,17 @@ Or, create a new one
 
 `nix flake new --template github:justinrubek/thoenix#flake-module ./terraform-project`
 
+- The `flake-module` template exposes a [flake-parts](https://github.com/hercules-ci/flake-parts) module that can be used to expose your configuration as flake outputs.
+- The `lib` example allows for more manual control over the final output values.
 
-The `flake-module` template exposes a [flake-parts](https://github.com/hercules-ci/flake-parts) module that can be used to expose your configuration as flake outputs.
-The `lib` example allows for more manual control over the final output values.
 
-Each template comes with a helper script, `tnix`, which can be used to run terraform commands from within individual configurations.
-The arguments `tnix` is called with are passed to the terraform cli with the exception of the first one which specifies which configuration to use.
-To initialize terraform after using the template you would run `tnix core init` from the default devShell.
-The value `core` refers to the name of the terraform configuration to use-- the subdirectory of the terraform configuration directory given to thoenix.
+## other info
+
+The flake's `cli` package includes a `terraform` subcommand which builds the terranix configuration and invoke `terraform`.
+
+- The first argument is the configuration's name, which corresponds a subdirectory in the repo's `terraform/configurations` directory. Terraform will be invoked within that directory.
+- All other arguments are passed through to terraform. You may need to escape some, i.e. `thoenix terraform apps init -- -upgrade`
+- This assumes that the configuration name is a flake output package: `.#terraformConfiguration/{name}`
 
 # why use this
 
