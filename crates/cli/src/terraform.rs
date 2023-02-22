@@ -13,8 +13,9 @@ impl crate::commands::Terraform {
 
         info!("building terraform configuration");
         let nix_eval = tokio::process::Command::new("nix")
-            .arg("eval")
-            .arg("--raw")
+            .arg("build")
+            .arg("--no-link")
+            .arg("--print-out-paths")
             .arg(format!(
                 ".#terraformConfiguration/{}",
                 self.configuration_name
