@@ -26,7 +26,7 @@
     ...
   }:
     flake-parts.lib.mkFlake {inherit self;} {
-      systems = [ "x86_64-linux" "aarch64-linux" ];
+      systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
       imports = [
         ./lib.nix
         ./flake-parts/cargo.nix
