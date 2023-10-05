@@ -1,4 +1,5 @@
 use crate::AppResult;
+use project_base_directory::Project;
 use std::{os::unix::prelude::PermissionsExt, path::PathBuf};
 use tracing::{debug, error, info};
 
@@ -37,8 +38,11 @@ impl crate::commands::Terraform {
         debug!(?derivation_path, "built terraform configuration");
         let generated_configuration_path = PathBuf::from(derivation_path).join("config.tf.json");
 
-        let repo = git2::Repository::discover(".")?;
-        let repo_path = repo.path().parent().unwrap();
+        let project = Project::discover_and_assume().await?;
+        let repo_path = project
+            .root_directory
+            .expect("failed to determine project root directory");
+
         // TODO: Support other terraform configuration directories?
         let configuration_directory = repo_path
             .join("terraform")
