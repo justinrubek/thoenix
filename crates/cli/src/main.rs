@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::error::Error;
 
 mod commands;
 mod error;
@@ -10,7 +11,7 @@ use error::AppResult;
 use server::Server;
 
 #[tokio::main]
-async fn main() -> AppResult<()> {
+async fn main() -> std::result::Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt::init();
 
     // process commands
@@ -31,7 +32,7 @@ async fn main() -> AppResult<()> {
 
             if !status.success() {
                 let code = status.code().expect("no exit code");
-                return Err(error::AppError::TerraformError(code));
+                return Err(error::AppError::TerraformError(code).into());
             }
         }
     }

@@ -16,6 +16,8 @@ pub enum AppError {
     GitPackDataInit(#[from] git_pack::data::init::Error),
     #[error(transparent)]
     Utf8(#[from] std::str::Utf8Error),
+    #[error(transparent)]
+    ProjectBaseDirectory(#[from] project_base_directory::error::Error),
 
     #[error(transparent)]
     SshError(#[from] thoenix_ssh::error::Error),
@@ -24,8 +26,6 @@ pub enum AppError {
 
     #[error("terraform error: {0}")]
     TerraformError(i32),
-    #[error("git repo error: {0}")]
-    GitRepo(#[from] git2::Error),
     #[error("failed to execute nix: {0}")]
     Nix(i32),
 }
