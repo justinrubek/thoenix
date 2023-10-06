@@ -14,9 +14,9 @@
       terranixModules ? [],
       extraArgs ? {},
       ...
-    }@attrs: let
+    } @ attrs: let
       # pass unused arguments to terranix
-      extraAttrs = builtins.removeAttrs attrs [ "path" "system" ];
+      extraAttrs = builtins.removeAttrs attrs ["path" "system"];
 
       filterFileName = name: lib.strings.hasSuffix ".nix" name;
 
@@ -62,11 +62,11 @@
       terranixModules ? [],
       extraArgs ? {},
       ...
-    }@attrs: let
+    } @ attrs: let
       # pass unused arguments to mkTerranixConfiguration
-      extraAttrs = builtins.removeAttrs attrs [ "name" "path" "pkgs" "system" ];
+      extraAttrs = builtins.removeAttrs attrs ["name" "path" "pkgs" "system"];
 
-      generatedConfig = self.lib.mkTerranixConfiguration {inherit path system terranixModules extraArgs; } // extraAttrs;
+      generatedConfig = self.lib.mkTerranixConfiguration {inherit path system terranixModules extraArgs;} // extraAttrs;
       providedConfig = self.lib.mkTerraformConfiguration {inherit path;};
     in
       pkgs.runCommandNoCC "terraform-config-${name}" {} ''

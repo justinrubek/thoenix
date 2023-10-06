@@ -4,7 +4,7 @@
   lib,
   ...
 }: {
-  imports = [ ];
+  imports = [];
 
   perSystem = {
     self',
