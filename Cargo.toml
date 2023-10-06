@@ -2,6 +2,13 @@
 members = ["crates/*"]
 resolver = "2"
 
+[workspace.package]
+edition = "2021"
+homepage = "https://github.com/justinrubek/thoenix"
+license = "MIT"
+repository = "https://github.com/justinrubek/thoenix"
+version = "0.1.0"
+
 [profile.release]
 # opt-level = 2 # fast and small wasm
 
