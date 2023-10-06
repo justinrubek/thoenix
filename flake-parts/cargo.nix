@@ -2,56 +2,35 @@
   inputs,
   self,
   ...
-} @ part-inputs: {
-  imports = [];
-
+}: {
   perSystem = {
     pkgs,
     lib,
     system,
     inputs',
+    self',
     ...
   }: let
-    devTools = with pkgs; [
-      # rust tooling
-      fenix-toolchain
-      bacon
-      rustfmt
-      cargo-nextest
-      # misc
-      pkgs.terraform
-    ];
+    # packages required for building the rust packages
+    extraPackages =
+      [
+        pkgs.pkg-config
+        pkgs.openssl
+        pkgs.openssl.dev
+      ]
+      ++ lib.optionals pkgs.stdenv.isDarwin [
+        pkgs.libiconv
+        pkgs.darwin.apple_sdk.frameworks.AppKit
+        pkgs.darwin.apple_sdk.frameworks.CoreFoundation
+        pkgs.darwin.apple_sdk.frameworks.CoreServices
+        pkgs.darwin.apple_sdk.frameworks.Foundation
+        pkgs.darwin.apple_sdk.frameworks.Security
+      ];
+    withExtraPackages = base: base ++ extraPackages;
 
-    extraNativeBuildInputs = [
-      pkgs.pkg-config
-      pkgs.openssl
-      pkgs.openssl.dev
-    ]  ++ lib.optionals pkgs.stdenv.isDarwin [
-      pkgs.libiconv
-      pkgs.darwin.apple_sdk.frameworks.AppKit
-      pkgs.darwin.apple_sdk.frameworks.CoreFoundation
-      pkgs.darwin.apple_sdk.frameworks.CoreServices
-      pkgs.darwin.apple_sdk.frameworks.Foundation
-      pkgs.darwin.apple_sdk.frameworks.Security
-    ];
+    craneLib = inputs.crane.lib.${system}.overrideToolchain self'.packages.rust-toolchain;
 
-    # allBuildInputs = base: base ++ extraBuildInputs;
-    allNativeBuildInputs = base: base ++ extraNativeBuildInputs;
-
-    fenix-channel = inputs'.fenix.packages.latest;
-    fenix-toolchain = fenix-channel.withComponents [
-      "rustc"
-      "cargo"
-      "clippy"
-      "rust-analysis"
-      "rust-src"
-      "rustfmt"
-      "llvm-tools-preview"
-    ];
-
-    craneLib = inputs.crane.lib.${system}.overrideToolchain fenix-toolchain;
-
-    common-build-args = rec {
+    commonArgs = rec {
       src = inputs.nix-filter.lib {
         root = ../.;
         include = [
@@ -63,69 +42,53 @@
 
       pname = "thoenix";
 
-      nativeBuildInputs = allNativeBuildInputs [];
+      nativeBuildInputs = withExtraPackages [];
       LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeBuildInputs;
     };
-    deps-only = craneLib.buildDepsOnly ({} // common-build-args);
 
-    clippy-check = craneLib.cargoClippy ({
-        cargoArtifacts = deps-only;
-        cargoClippyExtraArgs = "--all-features -- --deny warnings";
-      }
-      // common-build-args);
-
-    rust-fmt-check = craneLib.cargoFmt ({
-        inherit (common-build-args) src;
-      }
-      // common-build-args);
-
-    tests-check = craneLib.cargoNextest ({
-        cargoArtifacts = deps-only;
-        partitions = 1;
-        partitionType = "count";
-      }
-      // common-build-args);
-
-    pre-commit-hooks = inputs.pre-commit-hooks.lib.${system}.run {
-      inherit (common-build-args) src;
-      hooks = {
-        alejandra.enable = true;
-        rustfmt.enable = true;
-      };
-    };
-
-    cli-package = craneLib.buildPackage ({
-        pname = "thoenix";
-        cargoArtifacts = deps-only;
-        cargoExtraArgs = "--bin thoenix";
-      }
-      // common-build-args);
-  in rec {
-    devShells.default = pkgs.mkShell rec {
-      packages = allNativeBuildInputs [fenix-toolchain] ++ devTools;
-      LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath packages;
-      inherit (self.checks.${system}.pre-commit-hooks) shellHook;
-    };
+    cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
     packages = {
-      inherit fenix-toolchain;
       default = packages.cli;
-      cli = cli-package;
-    };
+      cli = craneLib.buildPackage ({
+          pname = "thoenix";
+          inherit cargoArtifacts;
+          cargoExtraArgs = "--bin thoenix";
+          meta.mainProgram = "thoenix";
+        }
+        // commonArgs);
 
-    apps = {
-      cli = {
-        type = "app";
-        program = "${self.packages.${system}.cli}/bin/thoenix";
-      };
-      default = apps.cli;
+      cargo-doc = craneLib.cargoDoc ({
+          inherit cargoArtifacts;
+        }
+        // commonArgs);
     };
 
     checks = {
-      inherit pre-commit-hooks;
-      clippy = clippy-check;
-      tests = tests-check;
-      rust-fmt = rust-fmt-check;
+      clippy = craneLib.cargoClippy (commonArgs
+        // {
+          inherit cargoArtifacts;
+          cargoClippyExtraArgs = "--all-features -- --deny warnings";
+        });
+
+      rust-fmt = craneLib.cargoFmt (commonArgs
+        // {
+          inherit (commonArgs) src;
+        });
+
+      rust-tests = craneLib.cargoNextest (commonArgs
+        // {
+          inherit cargoArtifacts;
+          partitions = 1;
+          partitionType = "count";
+          cargoExtraArgs = "--exclude annapurna-wasm --exclude annapurna-ui --workspace";
+        });
+    };
+  in rec {
+    inherit packages checks;
+
+    legacyPackages = {
+      cargoExtraPackages = extraPackages;
     };
   };
 }
