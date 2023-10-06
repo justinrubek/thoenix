@@ -17,19 +17,32 @@
       url = "github:cachix/pre-commit-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    bomper = {
+      url = "github:justinrubek/bomper";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = {
+  outputs = inputs @ {
     self,
-    flake-utils,
     flake-parts,
     ...
   }:
-    flake-parts.lib.mkFlake {inherit self;} {
+    flake-parts.lib.mkFlake {inherit inputs;} {
       systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
       imports = [
         ./lib.nix
+
+        ./flake-parts/rust-toolchain.nix
         ./flake-parts/cargo.nix
+
+        ./flake-parts/shells.nix
+        ./flake-parts/ci.nix
+
+        ./flake-parts/pre-commit.nix
+        ./flake-parts/formatting.nix
+        inputs.pre-commit-hooks.flakeModule
       ];
 
       flake = {
