@@ -54,7 +54,7 @@
         };
       };
 
-      config = let 
+      config = let
         # individual terraform configurations are stored in the `terraform/configuration` directory
         # and are referenced by their name in the configuration directory
         terraformConfigurationDirectory = cfg.configDirectory;
@@ -108,7 +108,7 @@
               echo '${configurationJSON}' > $out/terraform-configuration-matrix.json
             '';
           };
-      in 
+      in
         lib.mkIf cfg.enable rec {
           packages =
             {
@@ -139,7 +139,6 @@
             };
           };
         };
-
-      });
-    };
-  }
+    });
+  };
+}
