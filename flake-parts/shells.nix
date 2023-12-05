@@ -21,7 +21,7 @@
       # formatting
       self'.packages.treefmt
       # misc
-      pkgs.terraform
+      pkgs.opentofu
     ];
   in {
     devShells = {
