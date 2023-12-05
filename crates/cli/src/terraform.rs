@@ -67,7 +67,7 @@ impl crate::commands::Terraform {
 
         // Call the terraform executable with the provided args
         info!(?configuration_directory, ?self.args, "invoking terraform");
-        let terraform = tokio::process::Command::new("terraform")
+        let terraform = tokio::process::Command::new(&self.command)
             .arg(format!("-chdir={}", configuration_directory.display()))
             .args(self.args)
             .spawn()?;

@@ -41,4 +41,7 @@ pub(crate) struct Terraform {
     #[arg()]
     /// the arguments to pass to terraform
     pub args: Vec<String>,
+    /// the command to run when invoking terraform
+    #[arg(long, short, default_value = "tofu")]
+    pub command: String,
 }
