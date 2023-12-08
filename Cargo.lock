@@ -2976,7 +2976,7 @@ dependencies = [
 
 [[package]]
 name = "thoenix"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3001,7 +3001,7 @@ dependencies = [
 
 [[package]]
 name = "thoenix-http"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -3020,7 +3020,7 @@ dependencies = [
 
 [[package]]
 name = "thoenix-ssh"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
