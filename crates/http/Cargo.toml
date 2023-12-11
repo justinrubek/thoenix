@@ -11,6 +11,8 @@ futures = "0.3.26"
 futures-util = "0.3.26"
 git2 = "0.16.1"
 hyper = "0.14.24"
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = "1.0.38"
 tracing = "0.1.37"
 
@@ -28,4 +30,4 @@ features = ["util"]
 
 [dependencies.tower-http]
 version = "0.3.0"
-features = ["fs", "cors"]
+features = ["fs", "cors", "trace"]
