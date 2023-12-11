@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::error::Error;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod commands;
 mod error;
@@ -12,7 +13,14 @@ use server::Server;
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "thoenix_http=debug,tower_http=debug,axum::rejection=trace".into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     // process commands
     let args = commands::Args::parse();
