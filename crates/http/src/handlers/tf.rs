@@ -1,9 +1,35 @@
-use super::*;
-use crate::error::Error;
-use axum::{extract::Path, response::IntoResponse, Json};
+use crate::{
+    error::{Error, Result},
+    ServerState,
+};
+use axum::{
+    extract::{Path, Query, State},
+    response::IntoResponse,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TerraformLock {
+    #[serde(rename = "ID")]
+    pub id: String,
+    #[serde(rename = "Operation")]
+    pub operation: String,
+    #[serde(rename = "Info")]
+    pub info: String,
+    #[serde(rename = "Who")]
+    pub who: String,
+    #[serde(rename = "Version")]
+    pub version: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct TerraformLockQuery {
+    #[serde(rename = "ID")]
+    pub id: String,
+}
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TerraformState {
@@ -43,26 +69,6 @@ impl TerraformState {
 
         Ok(())
     }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TerraformLock {
-    #[serde(rename = "ID")]
-    pub id: String,
-    #[serde(rename = "Operation")]
-    pub operation: String,
-    #[serde(rename = "Info")]
-    pub info: String,
-    #[serde(rename = "Who")]
-    pub who: String,
-    #[serde(rename = "Version")]
-    pub version: String,
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct TerraformLockQuery {
-    #[serde(rename = "ID")]
-    pub id: String,
 }
 
 pub async fn get_tf_state(

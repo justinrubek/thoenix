@@ -4,7 +4,14 @@ use axum::{
     routing::{get, post, put},
     Router,
 };
-use handlers::tf::{TerraformLock, TerraformState};
+#[allow(unused_imports)]
+use handlers::{
+    git::{list_refs, list_refs_child, receive_pack},
+    tf::{
+        get_tf_state, lock_tf_state, unlock_tf_state, update_tf_state, TerraformLock,
+        TerraformState,
+    },
+};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tracing::{info_span, Span};
 
@@ -14,11 +21,6 @@ pub mod handlers;
 pub mod message;
 
 use error::Result;
-#[allow(unused_imports)]
-use handlers::{
-    list_refs, list_refs_child, receive_pack,
-    tf::{get_tf_state, lock_tf_state, unlock_tf_state, update_tf_state},
-};
 use message::GitCodec;
 
 pub struct ServerState {
