@@ -7,12 +7,10 @@ use axum::{
 #[allow(unused_imports)]
 use handlers::{
     git::{list_refs, list_refs_child, receive_pack},
-    tf::{
-        get_tf_state, lock_tf_state, unlock_tf_state, update_tf_state, TerraformLock,
-        TerraformState,
-    },
+    tf::{get_tf_state, lock_tf_state, unlock_tf_state, update_tf_state},
 };
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use thoenix_tofu::InMemoryState;
 use tracing::{info_span, Span};
 
 pub mod codec;
@@ -27,65 +25,6 @@ pub struct ServerState {
     pub repo_path: PathBuf,
 
     pub tf_state: tokio::sync::Mutex<InMemoryState>,
-}
-
-#[derive(Debug, Default)]
-pub struct InMemoryState {
-    pub tf_state: std::collections::HashMap<String, TerraformState>,
-}
-
-impl InMemoryState {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub async fn create_state(&mut self, id: String) -> Result<()> {
-        self.tf_state.insert(id, TerraformState::default());
-
-        Ok(())
-    }
-
-    pub async fn get_state(&self, id: &str) -> Result<Option<TerraformState>> {
-        let state = self.tf_state.get(id).cloned();
-
-        Ok(state)
-    }
-
-    pub async fn expect_not_locked(&self, id: &str) -> Result<()> {
-        let state = self.tf_state.get(id).ok_or(error::Error::NotFound)?;
-
-        if state.is_locked() {
-            return Err(error::Error::StateLocked);
-        }
-
-        Ok(())
-    }
-
-    pub async fn update_state(&mut self, id: &str, lock_id: &str, data: String) -> Result<()> {
-        // Ensure that the state is not locked
-        let state = self.tf_state.get_mut(id).ok_or(error::Error::NotFound)?;
-        state.check_lock(lock_id)?;
-
-        state.data = data;
-
-        Ok(())
-    }
-
-    pub async fn lock_state(&mut self, id: &str, lock: TerraformLock) -> Result<()> {
-        let state = self.tf_state.get_mut(id).ok_or(error::Error::NotFound)?;
-
-        state.lock(lock)?;
-
-        Ok(())
-    }
-
-    pub async fn unlock_state(&mut self, id: &str, lock: &TerraformLock) -> Result<()> {
-        let state = self.tf_state.get_mut(id).ok_or(error::Error::NotFound)?;
-
-        state.unlock(lock)?;
-
-        Ok(())
-    }
 }
 
 pub struct Server {

@@ -7,6 +7,8 @@ pub enum Error {
     #[error(transparent)]
     Git(#[from] git2::Error),
     #[error(transparent)]
+    Tofu(#[from] thoenix_tofu::error::Error),
+    #[error(transparent)]
     Utf8(#[from] std::string::FromUtf8Error),
 
     #[error("Missing service")]
@@ -27,6 +29,7 @@ impl axum::response::IntoResponse for Error {
             Error::Hyper(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Error::Io(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Error::Git(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            Error::Tofu(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Error::Utf8(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
 
             Error::MissingService => axum::http::StatusCode::BAD_REQUEST,
