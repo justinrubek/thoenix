@@ -3161,6 +3161,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "thoenix-tofu",
  "tokio",
  "tokio-util",
  "tower",
@@ -3187,6 +3188,14 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "thoenix-tofu"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
