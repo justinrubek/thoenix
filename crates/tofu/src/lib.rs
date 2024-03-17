@@ -1,4 +1,3 @@
-#![feature(async_fn_in_trait)]
 use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 
@@ -65,6 +64,7 @@ pub struct TerraformLock {
     pub version: String,
 }
 
+#[allow(async_fn_in_trait)]
 pub trait TerraformStateProvider {
     async fn get_state(&self, id: &str) -> Result<Option<TerraformState>>;
     async fn update_state(&mut self, id: &str, lock_id: &str, data: String) -> Result<()>;
