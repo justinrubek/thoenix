@@ -27,7 +27,7 @@
       # p.tfe
       # p.vault
     ];
-    terraform = pkgs.terraform.withPlugins terraformPluginsPredicate;
+    terraform = pkgs.opentofu.withPlugins terraformPluginsPredicate;
   in rec {
     packages = {
       # expose terraform with the pinned providers
