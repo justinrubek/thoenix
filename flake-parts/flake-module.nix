@@ -1,4 +1,4 @@
-{
+{thoenix-lib, ...}: {
   self,
   lib,
   flake-parts-lib,
@@ -61,9 +61,9 @@
 
         # builds the terranix configuration for each terraform configuration
         # and merges them into a single configuration derivation
-        finalConfigurations = inputs.thoenix.lib.buildTerraformConfigurations {
+        finalConfigurations = thoenix-lib.buildTerraformConfigurations {
           configDir = terraformConfigurationDirectory;
-          configNames = inputs.thoenix.lib.determineSubdirNames {
+          configNames = thoenix-lib.determineSubdirNames {
             path = terraformConfigurationDirectory;
           };
           terranixModules = cfg.terranixModules;
