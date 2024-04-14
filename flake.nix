@@ -29,7 +29,9 @@
     flake-parts,
     ...
   }:
-    flake-parts.lib.mkFlake {inherit inputs;} {
+    flake-parts.lib.mkFlake {inherit inputs;} ({flake-parts-lib, ...}: let
+      inherit (flake-parts-lib) importApply;
+    in {
       systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
       imports = [
         ./lib.nix
@@ -58,8 +60,8 @@
           };
         };
 
-        flakeModule = ./flake-parts/flake-module.nix;
+        flakeModule = importApply ./flake-parts/flake-module.nix {thoenix-lib = self.lib;};
         customOutputModule = ./custom-outputs.nix;
       };
-    };
+    });
 }
