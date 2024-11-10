@@ -1,4 +1,5 @@
 use crate::error::AppResult;
+use russh::server::Server as RusshServer;
 use russh_keys::PublicKeyBase64;
 use std::{path::PathBuf, sync::Arc};
 use tracing::info;
@@ -22,11 +23,11 @@ impl Server {
             auth_rejection_time: std::time::Duration::from_secs(3),
             auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
             keys: vec![keys],
-            connection_timeout: Some(std::time::Duration::from_secs(30)),
+            inactivity_timeout: Some(std::time::Duration::from_secs(30)),
             ..Default::default()
         };
 
-        let server = thoenix_ssh::handler::SshServer {
+        let mut server = thoenix_ssh::handler::SshServer {
             data_dir: PathBuf::from(data_dir),
         };
 
@@ -42,7 +43,7 @@ impl Server {
         info!(%public_key);
 
         info!(?address, "starting server");
-        russh::server::run(Arc::new(config), address, server).await?;
+        server.run_on_address(Arc::new(config), address).await?;
 
         Ok(())
     }

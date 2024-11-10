@@ -55,7 +55,7 @@ impl Server {
             })
             .on_request(|_request: &Request<_>, span: &Span| {
                 let id = "TODO: request ID";
-                span.record("request_id", &tracing::field::display(id));
+                span.record("request_id", tracing::field::display(id));
             });
 
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
