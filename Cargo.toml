@@ -11,6 +11,9 @@ repository = "https://github.com/justinrubek/thoenix"
 authors = ["Justin Rubek"]
 
 [workspace.dependencies]
+ed25519-dalek = "2.1.0"
+russh = "0.46"
+russh-keys = "0.46"
 serde_json = "1"
 thiserror = "1.0.38"
 tracing = "0.1.37"

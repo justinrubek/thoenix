@@ -196,43 +196,43 @@ impl SshSession {
 impl russh::server::Handler for SshSession {
     type Error = error::Error;
 
-    async fn auth_password(self, user: &str, password: &str) -> Result<(Self, Auth)> {
+    async fn auth_password(&mut self, user: &str, password: &str) -> Result<Auth> {
         info!(?user, ?password, "auth password");
-        Ok((self, Auth::Accept))
+        Ok(Auth::Accept)
     }
 
     async fn auth_publickey(
-        self,
+        &mut self,
         user: &str,
         public_key: &russh_keys::key::PublicKey,
-    ) -> Result<(Self, Auth)> {
+    ) -> Result<Auth> {
         info!(%user, ?public_key, "auth public key");
-        Ok((self, Auth::Accept))
+        Ok(Auth::Accept)
     }
 
     async fn channel_open_session(
-        mut self,
+        &mut self,
         channel: russh::Channel<russh::server::Msg>,
-        session: Session,
-    ) -> Result<(Self, bool, Session)> {
+        _session: &mut Session,
+    ) -> Result<bool> {
         let channel_id = channel.id();
         info!(?channel_id, "channel open session");
         {
             let mut clients = self.clients.lock().await;
             clients.insert(channel.id(), channel);
         }
-        Ok((self, true, session))
+        Ok(true)
     }
 
     /// Our entrypoint for connections will be the `exec` command
     /// We will determine if the command is one we support and then'
     /// create a new task to handle the command
     async fn exec_request(
-        mut self,
+        &mut self,
         channel_id: russh::ChannelId,
         data: &[u8],
-        mut session: Session,
-    ) -> Result<(Self, Session)> {
+        session: &mut Session,
+    ) -> Result<()> {
         info!(%channel_id, "exec request");
         let command_str = String::from_utf8_lossy(data);
         info!(%command_str, "sending exec request");
@@ -261,17 +261,17 @@ impl russh::server::Handler for SshSession {
         }?;
 
         session.channel_success(channel_id);
-        Ok((self, session))
+        Ok(())
     }
 
     /// Called with data is received from the client
     /// In order for data to be received, the channel must be established as successful
     async fn data(
-        mut self,
+        &mut self,
         channel_id: russh::ChannelId,
         data: &[u8],
-        session: russh::server::Session,
-    ) -> Result<(Self, russh::server::Session)> {
+        _session: &mut russh::server::Session,
+    ) -> Result<()> {
         tracing::info!(%channel_id, "data");
         self.input_buf.extend_from_slice(data);
 
@@ -311,7 +311,7 @@ impl russh::server::Handler for SshSession {
             }
         }
 
-        Ok((self, session))
+        Ok(())
     }
 
     /*
